@@ -474,7 +474,13 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
                             () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => SummaryScreen(summary: _summaryContent),
+                            builder: (context) => SummaryScreen(
+                              summary: _summaryContent,
+                              onRetry: () {
+                                Navigator.pop(context);
+                                _processWithGemini(_transcription);
+                              },
+                            ),
                           ),
                         ),
                       ),
@@ -487,7 +493,13 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
                             () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => PrescriptionScreen(prescription: _prescriptionContent),
+                            builder: (context) => PrescriptionScreen(
+                              prescription: _prescriptionContent,
+                              onRetry: () {
+                                Navigator.pop(context);
+                                _processWithGemini(_transcription);
+                              },
+                            ),
                           ),
                         ),
                       ),

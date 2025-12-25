@@ -7,8 +7,9 @@ import 'package:share_plus/share_plus.dart';
 
 class PrescriptionScreen extends StatefulWidget {
   final String prescription;
+  final VoidCallback? onRetry;
 
-  const PrescriptionScreen({super.key, required this.prescription});
+  const PrescriptionScreen({super.key, required this.prescription, this.onRetry});
 
   @override
   State<PrescriptionScreen> createState() => _PrescriptionScreenState();
@@ -125,43 +126,75 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                   Expanded(
                     child: SingleChildScrollView(
                       child: widget.prescription.isEmpty
-                          ? const Text(
-                        'No prescription available',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontStyle: FontStyle.italic,
-                          color: Colors.grey,
-                        ),
-                      )
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 40.0),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.medication, size: 64, color: Colors.deepPurple.withOpacity(0.9)),
+                                    const SizedBox(height: 16),
+                                    const Text(
+                                      'No prescription available',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      'Generate a prescription by recording a conversation and processing it.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    if (widget.onRetry != null) ...[
+                                      const SizedBox(height: 16),
+                                      ElevatedButton.icon(
+                                        onPressed: widget.onRetry,
+                                        icon: const Icon(Icons.refresh),
+                                        label: const Text('Retry'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.deepPurple,
+                                        ),
+                                      ),
+                                    ]
+                                  ],
+                                ),
+                              ),
+                            )
                           : MarkdownBody(
-                        data: widget.prescription,
-                        styleSheet: MarkdownStyleSheet(
-                          p: const TextStyle(
-                            fontSize: 16,
-                            height: 1.5,
-                            color: Colors.black87,
-                          ),
-                          h1: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.deepPurple,
-                          ),
-                          h2: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.deepPurple,
-                          ),
-                          h3: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.deepPurple,
-                          ),
-                          listBullet: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.deepPurple,
-                          ),
-                        ),
-                      ),
+                              data: widget.prescription,
+                              styleSheet: MarkdownStyleSheet(
+                                p: const TextStyle(
+                                  fontSize: 16,
+                                  height: 1.5,
+                                  color: Colors.black87,
+                                ),
+                                h1: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.deepPurple,
+                                ),
+                                h2: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.deepPurple,
+                                ),
+                                h3: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.deepPurple,
+                                ),
+                                listBullet: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.deepPurple,
+                                ),
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -171,7 +204,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _isSaving ? null : _savePrescription,
+        onPressed: (widget.prescription.isEmpty || _isSaving) ? null : _savePrescription,
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         elevation: 8,

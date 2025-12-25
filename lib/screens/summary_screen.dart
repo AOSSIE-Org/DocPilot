@@ -3,8 +3,9 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 
 class SummaryScreen extends StatelessWidget {
   final String summary;
+  final VoidCallback? onRetry;
 
-  const SummaryScreen({super.key, required this.summary});
+  const SummaryScreen({super.key, required this.summary, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -56,43 +57,75 @@ class SummaryScreen extends StatelessWidget {
                   Expanded(
                     child: SingleChildScrollView(
                       child: summary.isEmpty
-                          ? const Text(
-                        'No summary available',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontStyle: FontStyle.italic,
-                          color: Colors.grey,
-                        ),
-                      )
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 40.0),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.summarize, size: 64, color: Colors.deepPurple.withOpacity(0.9)),
+                                    const SizedBox(height: 16),
+                                    const Text(
+                                      'No summary available',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      'Try recording again or tap retry to process the latest transcription.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    if (onRetry != null) ...[
+                                      const SizedBox(height: 16),
+                                      ElevatedButton.icon(
+                                        onPressed: onRetry,
+                                        icon: const Icon(Icons.refresh),
+                                        label: const Text('Retry'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.deepPurple,
+                                        ),
+                                      ),
+                                    ]
+                                  ],
+                                ),
+                              ),
+                            )
                           : MarkdownBody(
-                        data: summary,
-                        styleSheet: MarkdownStyleSheet(
-                          p: const TextStyle(
-                            fontSize: 16,
-                            height: 1.5,
-                            color: Colors.black87,
-                          ),
-                          h1: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.deepPurple,
-                          ),
-                          h2: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.deepPurple,
-                          ),
-                          h3: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.deepPurple,
-                          ),
-                          listBullet: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.deepPurple,
-                          ),
-                        ),
-                      ),
+                              data: summary,
+                              styleSheet: MarkdownStyleSheet(
+                                p: const TextStyle(
+                                  fontSize: 16,
+                                  height: 1.5,
+                                  color: Colors.black87,
+                                ),
+                                h1: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.deepPurple,
+                                ),
+                                h2: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.deepPurple,
+                                ),
+                                h3: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.deepPurple,
+                                ),
+                                listBullet: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.deepPurple,
+                                ),
+                              ),
+                            ),
                     ),
                   ),
                 ],
