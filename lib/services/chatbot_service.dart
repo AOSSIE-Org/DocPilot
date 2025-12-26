@@ -5,7 +5,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ChatbotService {
   // Get API key from .env file
-  final String apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+    // Get API key using config fallback (dart-define > .env)
+    String get apiKey => getGeminiApiKey();
 
   // Get a response from Gemini based on a prompt
   Future<String> getGeminiResponse(String prompt) async {

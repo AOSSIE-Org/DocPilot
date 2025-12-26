@@ -17,7 +17,14 @@ import 'screens/summary_screen.dart';
 import 'screens/prescription_screen.dart';
 
 Future<void> main() async {
-  await dotenv.load();
+  // Try loading .env if present; if not, continue and rely on --dart-define.
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    // No .env found in production builds; use --dart-define fallback
+    developer.log('No .env loaded: $e');
+  }
+
   runApp(const MyApp());
 }
 
@@ -186,7 +193,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
 
   Future<void> _transcribeAudio() async {
     try {
-      final apiKey = dotenv.env['DEEPGRAM_API_KEY'] ?? '';
+      final apiKey = getDeepgramApiKey();
       final uri = Uri.parse('https://api.deepgram.com/v1/listen?model=nova-2');
 
       final file = File(_recordingPath);
