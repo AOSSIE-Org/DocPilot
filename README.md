@@ -123,3 +123,13 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Custom AI model fine-tuning for medical terminology
 - Appointment scheduling integration
 - Medical image analysis
+
+## Connect With AOSSIE
+
+Stay connected and join the community:
+
+- **Website:** https://aossie.org/
+- **GitHub:** https://github.com/AOSSIE-Org
+- **X (Twitter):** https://x.com/aossie_org
+- **YouTube:** https://www.youtube.com/@AOSSIE
+- **Discord:** (insert official invite link if available)
