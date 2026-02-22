@@ -132,4 +132,4 @@ Stay connected and join the community:
 - **GitHub:** https://github.com/AOSSIE-Org
 - **X (Twitter):** https://x.com/aossie_org
 - **YouTube:** https://www.youtube.com/@AOSSIE
-- **Discord:** (insert official invite link if available)
+- **Discord:** https://discord.com/invite/hjUhu33uAn
