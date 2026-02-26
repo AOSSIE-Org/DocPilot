@@ -10,6 +10,7 @@ class GeminiService {
   }
 
   Future<String> generatePrescription(String transcription) async {
+    await Future.delayed(const Duration(seconds: 3));
     return await _chatbotService.getGeminiResponse(
       "Generate a prescription based on the conversation in this transcription: $transcription",
     );
