@@ -1,30 +1,44 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:doc_pilot_new_app_gradel_fix/main.dart';
+import 'package:doc_pilot_new_app_gradel_fix/screens/prescription_screen.dart';
+import 'package:doc_pilot_new_app_gradel_fix/screens/summary_screen.dart';
+import 'package:doc_pilot_new_app_gradel_fix/screens/transcription_detail_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('SummaryScreen shows fallback when summary is empty', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SummaryScreen(summary: ''),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('Conversation Summary'), findsOneWidget);
+    expect(find.text('No summary available'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('PrescriptionScreen renders markdown content', (WidgetTester tester) async {
+    const prescription = '# Prescription\n\n- Paracetamol 500mg';
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: PrescriptionScreen(prescription: prescription),
+      ),
+    );
+
+    expect(find.text('Prescription'), findsWidgets);
+    expect(find.text('Paracetamol 500mg'), findsOneWidget);
+  });
+
+  testWidgets('TranscriptionDetailScreen renders transcription text', (WidgetTester tester) async {
+    const transcription = 'Doctor: How are you feeling today?';
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: TranscriptionDetailScreen(transcription: transcription),
+      ),
+    );
+
+    expect(find.text('Doctor-Patient Conversation'), findsOneWidget);
+    expect(find.text('Doctor: How are you feeling today?'), findsOneWidget);
   });
 }
