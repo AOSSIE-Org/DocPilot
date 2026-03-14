@@ -250,10 +250,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
           _isProcessing = true;
         });
 
-        // Print the transcription to console
-        print('\n============ TRANSCRIPTION RESULT ============');
-        print(_transcription);
-        print('=============================================');
+        developer.log('Transcription result: $_transcription', name: 'TranscriptionScreen');
 
         if (!_chatbotService.hasValidApiKey) {
           setState(() {
@@ -294,7 +291,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
         _transcription = 'Error during transcription';
         _isProcessing = false;
       });
-      print('Error: $e');
+      developer.log('Transcription error: $e', name: 'TranscriptionScreen', error: e);
     }
   }
 
@@ -325,13 +322,13 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
         _isProcessing = false;
       });
 
-      print('\n============ GEMINI PROCESSING COMPLETE ============');
+      developer.log('Gemini processing complete', name: 'TranscriptionScreen');
 
     } catch (e) {
       setState(() {
         _isProcessing = false;
       });
-      print('Error processing with Gemini: $e');
+      developer.log('Error processing with Gemini: $e', name: 'TranscriptionScreen', error: e);
     }
   }
 
@@ -400,7 +397,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.14),
+                      color: Colors.white.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -444,7 +441,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
                                     0.8,
                                     0.7 + value * 0.2
                                 ).toColor()
-                                    : Colors.white.withOpacity(0.5),
+                                    : Colors.white.withValues(alpha: 0.5),
                                 borderRadius: BorderRadius.circular(5),
                               ),
                             );
@@ -481,7 +478,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
                         color: _isRecording ? Colors.red : Colors.white,
                         boxShadow: [
                           BoxShadow(
-                            color: (_isRecording ? Colors.red : Colors.white).withOpacity(0.3),
+                            color: (_isRecording ? Colors.red : Colors.white).withValues(alpha: 0.3),
                             spreadRadius: 8,
                             blurRadius: 20,
                           ),
@@ -609,8 +606,8 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
           padding: const EdgeInsets.symmetric(vertical: 16),
           backgroundColor: Colors.white,
           foregroundColor: Colors.deepPurple,
-          disabledBackgroundColor: Colors.white.withOpacity(0.3),
-          disabledForegroundColor: Colors.white.withOpacity(0.5),
+          disabledBackgroundColor: Colors.white.withValues(alpha: 0.3),
+          disabledForegroundColor: Colors.white.withValues(alpha: 0.5),
           elevation: isEnabled ? 4 : 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
