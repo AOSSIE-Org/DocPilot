@@ -1,17 +1,14 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
-import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:developer' as developer;
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'services/chatbot_service.dart';
+import 'services/transcription_service.dart';
 import 'screens/transcription_detail_screen.dart';
 import 'screens/summary_screen.dart';
 import 'screens/prescription_screen.dart';
@@ -59,8 +56,9 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
   String _summaryContent = '';
   String _prescriptionContent = '';
 
-  // Chatbot service
+  // Services
   final ChatbotService _chatbotService = ChatbotService();
+  final TranscriptionService _transcriptionService = TranscriptionService();
 
   // For waveform animation
   late AnimationController _animationController;
@@ -185,67 +183,31 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
   }
 
   Future<void> _transcribeAudio() async {
-    try {
-      final apiKey = dotenv.env['DEEPGRAM_API_KEY'] ?? '';
-      final uri = Uri.parse('https://api.deepgram.com/v1/listen?model=nova-2');
+    final result = await _transcriptionService.transcribe(_recordingPath);
 
-      final file = File(_recordingPath);
-      if (!await file.exists()) {
-        setState(() {
-          _isTranscribing = false;
-          _transcription = 'Recording file not found';
-        });
-        return;
-      }
-
-      final bytes = await file.readAsBytes();
-      final response = await http.post(
-        uri,
-        headers: {
-          'Authorization': 'Token $apiKey',
-          'Content-Type': 'audio/m4a',
-        },
-        body: bytes,
-      );
-
-      if (response.statusCode == 200) {
-        final decodedResponse = json.decode(response.body);
-        final result = decodedResponse['results']['channels'][0]['alternatives'][0]['transcript'];
-
-        setState(() {
-          _isTranscribing = false;
-          _transcription = result.isNotEmpty ? result : 'No speech detected';
-          _formattedTranscription = _transcription; // Store raw transcription directly
-          _isProcessing = true;
-        });
-
-        // Print the transcription to console
-        print('\n============ TRANSCRIPTION RESULT ============');
-        print(_transcription);
-        print('=============================================');
-
-        // Send to Gemini for processing if we have a valid transcription
-        if (_transcription.isNotEmpty && _transcription != 'No speech detected') {
-          await _processWithGemini(_transcription);
-        } else {
-          setState(() {
-            _isProcessing = false;
-          });
-        }
-      } else {
-        setState(() {
-          _isTranscribing = false;
-          _transcription = 'Transcription failed';
-          _isProcessing = false;
-        });
-      }
-    } catch (e) {
+    if (!result.isSuccess) {
       setState(() {
         _isTranscribing = false;
-        _transcription = 'Error during transcription';
         _isProcessing = false;
+        _transcription = result.error!;
       });
-      print('Error: $e');
+      return;
+    }
+
+    final text = result.transcript!;
+    final hasContent = text.isNotEmpty;
+
+    setState(() {
+      _isTranscribing = false;
+      _transcription = hasContent ? text : 'No speech detected';
+      _formattedTranscription = _transcription;
+      _isProcessing = hasContent;
+    });
+
+    developer.log('Transcription: $_transcription', name: 'TranscriptionScreen');
+
+    if (hasContent) {
+      await _processWithGemini(text);
     }
   }
 
