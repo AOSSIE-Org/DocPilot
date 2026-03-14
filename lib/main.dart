@@ -8,7 +8,6 @@ import 'package:record/record.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:developer' as developer;
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'services/chatbot_service.dart';
@@ -17,7 +16,11 @@ import 'screens/summary_screen.dart';
 import 'screens/prescription_screen.dart';
 
 Future<void> main() async {
-  await dotenv.load();
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    await dotenv.load(fileName: '.env.example');
+  }
   runApp(const MyApp());
 }
 
@@ -66,6 +69,25 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
   late AnimationController _animationController;
   final List<double> _waveformValues = List.filled(40, 0.0);
   Timer? _waveformTimer;
+
+  bool _isValidApiKey(String value, String provider) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return false;
+    }
+
+    final normalized = trimmed.toLowerCase();
+    if (provider == 'deepgram') {
+      return !normalized.contains('your_deepgram_api_key_here') &&
+          !normalized.contains('replace_with') &&
+          !normalized.contains('example') &&
+          !normalized.contains('dummy');
+    }
+
+    return !normalized.contains('replace_with') &&
+        !normalized.contains('example') &&
+        !normalized.contains('dummy');
+  }
 
   @override
   void initState() {
@@ -187,6 +209,15 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
   Future<void> _transcribeAudio() async {
     try {
       final apiKey = dotenv.env['DEEPGRAM_API_KEY'] ?? '';
+      if (!_isValidApiKey(apiKey, 'deepgram')) {
+        setState(() {
+          _isTranscribing = false;
+          _isProcessing = false;
+          _transcription = 'DEEPGRAM_API_KEY is missing or still a placeholder. Add a real key to .env';
+        });
+        return;
+      }
+
       final uri = Uri.parse('https://api.deepgram.com/v1/listen?model=nova-2');
 
       final file = File(_recordingPath);
@@ -224,6 +255,15 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
         print(_transcription);
         print('=============================================');
 
+        if (!_chatbotService.hasValidApiKey) {
+          setState(() {
+            _isProcessing = false;
+            _summaryContent = 'Error: GEMINI_API_KEY is missing. Add it to your .env file.';
+            _prescriptionContent = 'Error: GEMINI_API_KEY is missing. Add it to your .env file.';
+          });
+          return;
+        }
+
         // Send to Gemini for processing if we have a valid transcription
         if (_transcription.isNotEmpty && _transcription != 'No speech detected') {
           await _processWithGemini(_transcription);
@@ -233,9 +273,18 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
           });
         }
       } else {
+        String message = 'Transcription failed (status ${response.statusCode})';
+        try {
+          final decodedError = json.decode(response.body);
+          final errorText = decodedError['error'] ?? decodedError['message'];
+          if (errorText is String && errorText.trim().isNotEmpty) {
+            message = 'Transcription failed: $errorText';
+          }
+        } catch (_) {}
+
         setState(() {
           _isTranscribing = false;
-          _transcription = 'Transcription failed';
+          _transcription = message;
           _isProcessing = false;
         });
       }
@@ -296,6 +345,11 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
 
   @override
   Widget build(BuildContext context) {
+    final deepgramKey = dotenv.env['DEEPGRAM_API_KEY'] ?? '';
+    final hasDeepgramKey = _isValidApiKey(deepgramKey, 'deepgram');
+    final hasGeminiKey = _chatbotService.hasValidApiKey;
+    final setupComplete = hasDeepgramKey && hasGeminiKey;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -309,9 +363,10 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
           ),
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-            child: Column(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // App header
@@ -331,12 +386,36 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
                       ? 'Transcribing your voice...'
                       : _isProcessing
                       ? 'Processing with Gemini...'
-                      : 'Tap the mic to begin',
+                      : setupComplete
+                      ? 'Tap the mic to begin'
+                      : 'Complete API setup to enable recording and AI output',
                   style: const TextStyle(
                     fontSize: 16,
                     color: Colors.white70,
                   ),
                 ),
+                if (!setupComplete) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Missing valid API keys:\n'
+                          '- DEEPGRAM_API_KEY (${hasDeepgramKey ? 'OK' : 'Missing/placeholder'})\n'
+                          '- GEMINI_API_KEY (${hasGeminiKey ? 'OK' : 'Missing/placeholder'})\n\n'
+                          'Create .env in the project root with real keys.',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.white,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 30),
 
                 // Waveform visualization
@@ -380,7 +459,20 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
                 // Microphone button
                 Center(
                   child: GestureDetector(
-                    onTap: (_isTranscribing || _isProcessing) ? null : _toggleRecording,
+                    onTap: (_isTranscribing || _isProcessing)
+                        ? null
+                        : () {
+                      if (!hasDeepgramKey) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Add a valid DEEPGRAM_API_KEY in .env first.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+                      _toggleRecording();
+                    },
                     child: Container(
                       width: 100,
                       height: 100,
@@ -449,55 +541,54 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
                 const SizedBox(height: 40),
 
                 // Vertical navigation buttons
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildNavigationButton(
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildNavigationButton(
+                      context,
+                      'Transcription',
+                      Icons.record_voice_over,
+                      _formattedTranscription.isNotEmpty,
+                          () => Navigator.push(
                         context,
-                        'Transcription',
-                        Icons.record_voice_over,
-                        _formattedTranscription.isNotEmpty,
-                            () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => TranscriptionDetailScreen(transcription: _formattedTranscription),
-                          ),
+                        MaterialPageRoute(
+                          builder: (context) => TranscriptionDetailScreen(transcription: _formattedTranscription),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      _buildNavigationButton(
+                    ),
+                    const SizedBox(height: 16),
+                    _buildNavigationButton(
+                      context,
+                      'Summary',
+                      Icons.summarize,
+                      _summaryContent.isNotEmpty,
+                          () => Navigator.push(
                         context,
-                        'Summary',
-                        Icons.summarize,
-                        _summaryContent.isNotEmpty,
-                            () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SummaryScreen(summary: _summaryContent),
-                          ),
+                        MaterialPageRoute(
+                          builder: (context) => SummaryScreen(summary: _summaryContent),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      _buildNavigationButton(
+                    ),
+                    const SizedBox(height: 16),
+                    _buildNavigationButton(
+                      context,
+                      'Prescription',
+                      Icons.medication,
+                      _prescriptionContent.isNotEmpty,
+                          () => Navigator.push(
                         context,
-                        'Prescription',
-                        Icons.medication,
-                        _prescriptionContent.isNotEmpty,
-                            () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PrescriptionScreen(prescription: _prescriptionContent),
-                          ),
+                        MaterialPageRoute(
+                          builder: (context) => PrescriptionScreen(prescription: _prescriptionContent),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
         ),
+      ),
       ),
     );
   }
