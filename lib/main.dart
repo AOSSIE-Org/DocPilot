@@ -314,14 +314,21 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // App header
-                const Text(
-                  'DocPilot',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+                // App header row with model picker
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'DocPilot',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    _buildModelPicker(),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -330,7 +337,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
                       : _isTranscribing
                       ? 'Transcribing your voice...'
                       : _isProcessing
-                      ? 'Processing with Gemini...'
+                      ? 'Processing with ${_chatbotService.selectedModel.displayName}...'
                       : 'Tap the mic to begin',
                   style: const TextStyle(
                     fontSize: 16,
@@ -499,6 +506,44 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildModelPicker() {
+    return PopupMenuButton<GeminiModel>(
+      initialValue: _chatbotService.selectedModel,
+      tooltip: 'Select AI model',
+      icon: const Icon(Icons.tune, color: Colors.white70, size: 22),
+      color: Colors.deepPurple.shade700,
+      onSelected: (model) {
+        setState(() {
+          _chatbotService.selectedModel = model;
+        });
+      },
+      itemBuilder: (_) => GeminiModel.values.map((model) {
+        return PopupMenuItem<GeminiModel>(
+          value: model,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                model.displayName,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: _chatbotService.selectedModel == model
+                      ? FontWeight.bold
+                      : FontWeight.normal,
+                ),
+              ),
+              Text(
+                model.description,
+                style: const TextStyle(fontSize: 11, color: Colors.white60),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 
