@@ -8,7 +8,6 @@ import 'package:record/record.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:developer' as developer;
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'services/chatbot_service.dart';
@@ -219,10 +218,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
           _isProcessing = true;
         });
 
-        // Print the transcription to console
-        print('\n============ TRANSCRIPTION RESULT ============');
-        print(_transcription);
-        print('=============================================');
+        developer.log('Transcription result: $_transcription', name: 'TranscriptionScreen');
 
         // Send to Gemini for processing if we have a valid transcription
         if (_transcription.isNotEmpty && _transcription != 'No speech detected') {
@@ -245,7 +241,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
         _transcription = 'Error during transcription';
         _isProcessing = false;
       });
-      print('Error: $e');
+      developer.log('Transcription error: $e', name: 'TranscriptionScreen', error: e);
     }
   }
 
@@ -276,13 +272,13 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
         _isProcessing = false;
       });
 
-      print('\n============ GEMINI PROCESSING COMPLETE ============');
+      developer.log('Gemini processing complete', name: 'TranscriptionScreen');
 
     } catch (e) {
       setState(() {
         _isProcessing = false;
       });
-      print('Error processing with Gemini: $e');
+      developer.log('Error processing with Gemini: $e', name: 'TranscriptionScreen', error: e);
     }
   }
 
@@ -365,7 +361,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
                                     0.8,
                                     0.7 + value * 0.2
                                 ).toColor()
-                                    : Colors.white.withOpacity(0.5),
+                                    : Colors.white.withValues(alpha: 0.5),
                                 borderRadius: BorderRadius.circular(5),
                               ),
                             );
@@ -389,7 +385,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
                         color: _isRecording ? Colors.red : Colors.white,
                         boxShadow: [
                           BoxShadow(
-                            color: (_isRecording ? Colors.red : Colors.white).withOpacity(0.3),
+                            color: (_isRecording ? Colors.red : Colors.white).withValues(alpha: 0.3),
                             spreadRadius: 8,
                             blurRadius: 20,
                           ),
@@ -518,8 +514,8 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
           padding: const EdgeInsets.symmetric(vertical: 16),
           backgroundColor: Colors.white,
           foregroundColor: Colors.deepPurple,
-          disabledBackgroundColor: Colors.white.withOpacity(0.3),
-          disabledForegroundColor: Colors.white.withOpacity(0.5),
+          disabledBackgroundColor: Colors.white.withValues(alpha: 0.3),
+          disabledForegroundColor: Colors.white.withValues(alpha: 0.5),
           elevation: isEnabled ? 4 : 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
