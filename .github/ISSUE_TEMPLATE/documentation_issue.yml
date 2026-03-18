@@ -1,0 +1,58 @@
+name: 📚 Documentation Issue
+description: Report an issue or improvement related to project documentation
+title: "[DOC]: "
+labels: ["documentation", "triage-needed"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve the documentation! Please provide the details below so we can understand and address the issue.
+
+  - type: textarea
+    id: documentation-issue
+    attributes:
+      label: Issue with Current Documentation
+      description: Describe the problem with the existing documentation
+      placeholder: |
+        Please explain what is unclear, missing, or incorrect in the documentation.
+        Include the section, file, or link where the issue appears.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested-change
+    attributes:
+      label: Suggested Improvement
+      description: If you have suggestions on how the documentation could be improved, please share them here
+      placeholder: |
+        Describe the change or improvement you would like to see.
+        Example:
+        - Add clarification for ...
+        - Update outdated instructions
+        - Provide additional examples
+    validations:
+      required: false
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Provide links or references to the documentation or code related to this issue
+      placeholder: |
+        Add links to relevant documentation pages, files, or sections.
+        Example:
+        https://github.com/AOSSIE-Org/SmartNotes/...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct and join our Discord
+      options:
+        - label: I have joined the [Discord server](https://discord.gg/hjUhu33uAn) and will post updates there
+          required: true
+        - label: I have searched existing issues to avoid duplicates
+          required: true

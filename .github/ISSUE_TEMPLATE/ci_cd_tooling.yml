@@ -1,0 +1,74 @@
+name: ⚙️ CI/CD & Tooling
+description: Suggest improvements related to CI/CD pipelines, workflows, or development tooling
+title: "[CI/CD]: "
+labels: ["ci-cd", "triage-needed"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement to the development workflow! Please provide the details below.
+
+  - type: textarea
+    id: cicd-tooling-change
+    attributes:
+      label: CI/CD or Tooling Change
+      description: Describe the CI/CD or tooling change you are proposing
+      placeholder: |
+        Explain what workflow, script, or tooling needs improvement.
+        Example:
+        - Update GitHub Actions workflow
+        - Improve build scripts
+        - Add linting or formatting automation
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tooling-category
+    attributes:
+      label: Category
+      description: What area does this change relate to?
+      options:
+        - GitHub Actions workflow
+        - Build scripts
+        - Linting / formatting
+        - Development environment
+        - Deployment pipeline
+        - Other tooling
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why is this change needed?
+      placeholder: |
+        Explain the motivation for this change.
+        Example:
+        - Current CI builds are slow
+        - Missing automated checks
+        - Improving reliability of workflows
+    validations:
+      required: true
+
+  - type: textarea
+    id: contributor-impact
+    attributes:
+      label: Impact on Contributors
+      description: Will this change affect contributors or local development workflows?
+      placeholder: |
+        Describe any expected impact on contributors or their local development setup.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct and join our Discord
+      options:
+        - label: I have joined the [Discord server](https://discord.gg/hjUhu33uAn) and will post updates there
+          required: true
+        - label: I have searched existing issues to avoid duplicates
+          required: true

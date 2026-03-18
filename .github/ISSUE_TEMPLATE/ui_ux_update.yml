@@ -1,0 +1,74 @@
+name: 🎨 UI/UX Update
+description: Propose improvements to the user interface or user experience
+title: "[UI/UX]: "
+labels: ["ui-ux", "triage-needed"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a UI/UX improvement! Please provide the details below.
+
+  - type: textarea
+    id: ui-ux-update
+    attributes:
+      label: UI/UX Update
+      description: Describe the UI/UX change you are proposing
+      placeholder: |
+        Explain which screen, component, or interaction should be improved.
+        Example:
+        - Improve layout of the home screen
+        - Update navigation flow
+        - Improve visual consistency across components
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-design-issues
+    attributes:
+      label: Current Design Issues
+      description: What problems exist with the current design?
+      placeholder: |
+        Example:
+        - Low contrast makes text hard to read
+        - Navigation is confusing
+        - Inconsistent styling across components
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: How would you improve the design?
+      placeholder: |
+        Describe the changes you would suggest.
+        You may also include mockups, screenshots, or design references.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: design-considerations
+    attributes:
+      label: Design Considerations
+      description: What aspects does this update address?
+      options:
+        - label: Accessibility
+        - label: Visual consistency
+        - label: User flow / navigation
+        - label: Responsive design
+        - label: Dark mode support
+        - label: Other
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct and join our Discord
+      options:
+        - label: I have joined the [Discord server](https://discord.gg/hjUhu33uAn) and will post updates there
+          required: true
+        - label: I have searched existing issues to avoid duplicates
+          required: true
