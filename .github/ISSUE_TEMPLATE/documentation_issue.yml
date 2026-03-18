@@ -42,7 +42,7 @@ body:
       placeholder: |
         Add links to relevant documentation pages, files, or sections.
         Example:
-        https://github.com/AOSSIE-Org/SmartNotes/...
+        https://github.com/AOSSIE-Org/DocPilot/...
     validations:
       required: false
 
