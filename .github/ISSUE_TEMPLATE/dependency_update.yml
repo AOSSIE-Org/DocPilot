@@ -1,0 +1,89 @@
+name: 📦 Dependency Update
+description: Suggest updating project dependencies or addressing deprecation warnings
+title: "[DEPS]: "
+labels: ["dependencies", "triage-needed"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping keep the project dependencies up to date! Please provide the details below.
+
+  - type: input
+    id: package-name
+    attributes:
+      label: Package Name
+      description: Which package or dependency needs to be updated?
+      placeholder: react
+    validations:
+      required: true
+
+  - type: input
+    id: current-version
+    attributes:
+      label: Current Version
+      description: What is the current version being used?
+      placeholder: 18.2.0
+    validations:
+      required: true
+
+  - type: input
+    id: target-version
+    attributes:
+      label: Target Version
+      description: What version do you propose updating to?
+      placeholder: 19.x.x
+    validations:
+      required: true
+
+  - type: dropdown
+    id: update-reason
+    attributes:
+      label: Reason for Update
+      description: Why is this update needed?
+      options:
+        - Security vulnerability fix
+        - Deprecation warning
+        - Bug fix in newer version
+        - Performance improvement
+        - Compatibility requirement
+        - New features needed
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: breaking-changes
+    attributes:
+      label: Breaking Changes
+      description: Does this update introduce any breaking changes?
+      placeholder: |
+        Describe any breaking changes or migration steps required.
+        Example:
+        - API method renamed
+        - Configuration format updated
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Provide links to changelogs, migration guides, or other relevant information
+      placeholder: |
+        Example:
+        Changelog: https://github.com/...
+        Migration guide: https://github.com/...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct and join our Discord
+      options:
+        - label: I have joined the [Discord server](https://discord.gg/hjUhu33uAn) and will post updates there
+          required: true
+        - label: I have searched existing issues to avoid duplicates
+          required: true
