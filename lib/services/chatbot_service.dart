@@ -4,26 +4,48 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ChatbotService {
-  // Get API key from .env file
-  final String apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+  final String? _apiKey;
+
+  ChatbotService({String? apiKey}) : _apiKey = apiKey?.trim();
+
+  String _resolveApiKey() {
+    final configuredKey = _apiKey;
+    if (configuredKey != null && configuredKey.isNotEmpty) {
+      return configuredKey;
+    }
+
+    try {
+      return (dotenv.env['GEMINI_API_KEY'] ?? '').trim();
+    } catch (_) {
+      return '';
+    }
+  }
 
   // Get a response from Gemini based on a prompt
   Future<String> getGeminiResponse(String prompt) async {
     print('\n=== GEMINI PROMPT ===');
     print(prompt);
 
-    final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey');
+    final apiKey = _resolveApiKey();
+    if (apiKey.isEmpty) {
+      return 'Error: Missing GEMINI_API_KEY in environment';
+    }
+
+    final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey');
 
     try {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          "contents": [{"parts": [{"text": prompt}]}],
-          "generationConfig": {
-            "temperature": 0.7,
-            "maxOutputTokens": 1024
-          }
+          "contents": [
+            {
+              "parts": [
+                {"text": prompt}
+              ]
+            }
+          ],
+          "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1024}
         }),
       );
 
@@ -33,10 +55,11 @@ class ChatbotService {
 
         print('\n=== GEMINI RESPONSE ===');
         print(result);
-
+        
         return result;
       } else {
         print('API Error: ${response.statusCode}');
+        print('Response: ${response.body}');
         return "Error: Could not generate response. Status code: ${response.statusCode}";
       }
     } catch (e) {
