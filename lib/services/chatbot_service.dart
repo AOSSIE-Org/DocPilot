@@ -23,8 +23,7 @@ class ChatbotService {
 
   // Get a response from Gemini based on a prompt
   Future<String> getGeminiResponse(String prompt) async {
-    print('\n=== GEMINI PROMPT ===');
-    print(prompt);
+    developer.log('=== Gemini request started  ===', name: 'ChatbotService');
 
     final apiKey = _resolveApiKey();
     if (apiKey.isEmpty) {
@@ -53,17 +52,18 @@ class ChatbotService {
         final data = jsonDecode(response.body);
         final result = data['candidates'][0]['content']['parts'][0]['text'];
 
-        print('\n=== GEMINI RESPONSE ===');
-        print(result);
+        developer.log('===Gemini response received ===', name: 'ChatbotService');
         
         return result;
       } else {
-        print('API Error: ${response.statusCode}');
-        print('Response: ${response.body}');
+        developer.log(
+          'Gemini API error: ${response.statusCode}',
+          name: 'ChatbotService',
+        );
         return "Error: Could not generate response. Status code: ${response.statusCode}";
       }
     } catch (e) {
-      print('Exception: $e');
+      developer.log('Gemini request exception: $e', name: 'ChatbotService');
       return "Error: Could not connect to API: $e";
     }
   }
