@@ -5,10 +5,26 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 class DeepgramService {
-  final String _apiKey = dotenv.env['DEEPGRAM_API_KEY'] ?? '';
+  final String? _apiKey;
+
+  DeepgramService({String? apiKey}) : _apiKey = apiKey?.trim();
+
+  String _resolveApiKey() {
+    final configuredKey = _apiKey;
+    if (configuredKey != null && configuredKey.isNotEmpty) {
+      return configuredKey;
+    }
+
+    try {
+      return (dotenv.env['DEEPGRAM_API_KEY'] ?? '').trim();
+    } catch (_) {
+      return '';
+    }
+  }
 
   Future<String> transcribe(String recordingPath) async {
-    if (_apiKey.trim().isEmpty) {
+    final apiKey = _resolveApiKey();
+    if (apiKey.isEmpty) {
       throw Exception('Missing DEEPGRAM_API_KEY in environment');
     }
 
@@ -26,7 +42,7 @@ class DeepgramService {
       response = await http.post(
         uri,
         headers: {
-          'Authorization': 'Token $_apiKey',
+          'Authorization': 'Token $apiKey',
           'Content-Type': 'audio/m4a',
         },
         body: bytes,

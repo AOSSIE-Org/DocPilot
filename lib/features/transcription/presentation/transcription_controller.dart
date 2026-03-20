@@ -34,8 +34,20 @@ class TranscriptionController extends ChangeNotifier {
   String get summary => data.summary;
   String get prescription => data.prescription;
 
-  Future<void> requestPermissions() async {
-    await Permission.microphone.request();
+  Future<bool> requestPermissions() async {
+    final status = await Permission.microphone.request();
+
+    if (status.isGranted) {
+      return true;
+    }
+
+    if (status.isPermanentlyDenied) {
+      _setError('Microphone permission permanently denied. Please enable it in settings.');
+      return false;
+    }
+
+    _setError('Microphone permission denied');
+    return false;
   }
 
   Future<void> toggleRecording() async {
@@ -48,30 +60,33 @@ class TranscriptionController extends ChangeNotifier {
 
   Future<void> _startRecording() async {
     try {
-      if (await _audioRecorder.hasPermission()) {
-        final directory = await getTemporaryDirectory();
-        _recordingPath =
-            '${directory.path}/recording_${DateTime.now().millisecondsSinceEpoch}.m4a';
-
-        await _audioRecorder.start(
-          RecordConfig(
-            encoder: AudioEncoder.aacLc,
-            bitRate: 128000,
-            sampleRate: 44100,
-          ),
-          path: _recordingPath,
-        );
-
-        // Reset previous data
-        data = const TranscriptionModel();
-        state = TranscriptionState.recording;
-        _startWaveformAnimation();
-        notifyListeners();
-
-        developer.log('Started recording to: $_recordingPath');
-      } else {
-        await requestPermissions();
+      if (!await _audioRecorder.hasPermission()) {
+        final granted = await requestPermissions();
+        if (!granted) {
+          return;
+        }
       }
+
+      final directory = await getTemporaryDirectory();
+      _recordingPath =
+          '${directory.path}/recording_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+      await _audioRecorder.start(
+        RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          sampleRate: 44100,
+        ),
+        path: _recordingPath,
+      );
+
+      // Reset previous data
+      data = const TranscriptionModel();
+      state = TranscriptionState.recording;
+      _startWaveformAnimation();
+      notifyListeners();
+
+      developer.log('Started recording to: $_recordingPath');
     } catch (e) {
       _setError('Error starting recording: $e');
     }
