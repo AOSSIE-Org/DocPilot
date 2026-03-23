@@ -185,11 +185,12 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
   }
 
   Future<void> _transcribeAudio() async {
+    final recordingPath = _recordingPath;
     try {
       final apiKey = dotenv.env['DEEPGRAM_API_KEY'] ?? '';
       final uri = Uri.parse('https://api.deepgram.com/v1/listen?model=nova-2');
 
-      final file = File(_recordingPath);
+      final file = File(recordingPath);
       if (!await file.exists()) {
         setState(() {
           _isTranscribing = false;
@@ -246,6 +247,26 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> with SingleTi
         _isProcessing = false;
       });
       print('Error: $e');
+    } finally {
+      await _deleteRecordingFile(recordingPath);
+      if (_recordingPath == recordingPath) {
+        _recordingPath = '';
+      }
+    }
+  }
+
+  Future<void> _deleteRecordingFile(String path) async {
+    if (path.isEmpty) return;
+
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+        developer.log('Deleted temporary recording: $path');
+      }
+    } catch (e) {
+      // Cleanup failures should not interrupt the user flow.
+      developer.log('Failed to delete temporary recording: $path', error: e);
     }
   }
 
