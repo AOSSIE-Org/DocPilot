@@ -131,5 +131,5 @@ Stay connected and join the community:
 - **Website:** https://aossie.org/
 - **GitHub:** https://github.com/AOSSIE-Org
 - **X (Twitter):** https://x.com/aossie_org
-- **YouTube:** https://www.youtube.com/@AOSSIE
+- **YouTube:** https://www.youtube.com/@AOSSIE-Org
 - **Discord:** https://discord.com/invite/hjUhu33uAn
