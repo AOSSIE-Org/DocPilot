@@ -14,21 +14,23 @@ DocPilot is a Flutter application designed to assist healthcare providers in rec
 
 ## Getting Started
 
+> For a detailed, step-by-step setup guide (including Windows, Android Studio, AVD, and common issues) see [SETUP.md](SETUP.md).
+
 ### Prerequisites
 
-- Flutter SDK (latest version recommended)
-- Dart SDK
-- Android Studio / VS Code with Flutter extensions
+- Flutter SDK 3.27+ (stable channel)
+- Dart SDK 3.6+
+- Android Studio (Hedgehog or newer) — needed for Android SDK and emulator
 - API keys for:
-    - Deepgram (for speech-to-text)
-    - Google Gemini (for AI processing)
+    - [Deepgram](https://console.deepgram.com) (speech-to-text)
+    - [Google Gemini](https://aistudio.google.com/app/apikey) (AI processing)
 
 ### Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/docpilot.git
-   cd docpilot
+   git clone https://github.com/AOSSIE-Org/DocPilot.git
+   cd DocPilot
    ```
 
 2. Install dependencies:
