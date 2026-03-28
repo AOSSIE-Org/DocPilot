@@ -41,6 +41,11 @@ DocPilot is a Flutter application designed to assist healthcare providers in rec
    DEEPGRAM_API_KEY=your_deepgram_api_key
    GEMINI_API_KEY=your_gemini_api_key
    ```
+   
+    Important: Do NOT commit your `.env` file. It contains sensitive API keys.
+    Use `.env.example` as a template and add `.env` to your `.gitignore`.
+    For CI or shared environments, store secrets in your CI provider's secret
+    management system or environment variables instead of committing them.
 
 4. Run the app:
    ```bash
