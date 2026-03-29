@@ -11,13 +11,16 @@ class MedicalInsights {
 
   factory MedicalInsights.fromJson(Map<String, dynamic> json) {
     return MedicalInsights(
+      // Coerce summary to String regardless of what the AI sends
       summary: json['summary']?.toString() ?? '',
       
+      // Safely parse lists to avoid 'type is not a subtype' errors
       symptoms: _parseList(json['symptoms']),
       medicines: _parseList(json['medicines']),
     );
   }
 
+  /// Helper to filter nulls and force elements to strings
   static List<String> _parseList(dynamic jsonValue) {
     if (jsonValue is! List) return [];
     return jsonValue
