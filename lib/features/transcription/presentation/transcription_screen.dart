@@ -10,6 +10,7 @@ class TranscriptionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Listen to changes in the controller
     final controller = context.watch<TranscriptionController>();
 
     return Scaffold(
@@ -32,7 +33,11 @@ class TranscriptionScreen extends StatelessWidget {
               children: [
                 const Text(
                   'DocPilot',
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: TextStyle(
+                    fontSize: 28, 
+                    fontWeight: FontWeight.bold, 
+                    color: Colors.white
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -41,7 +46,7 @@ class TranscriptionScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 30),
 
-                // Waveform
+                // Waveform Display
                 SizedBox(
                   height: 100,
                   child: Row(
@@ -96,7 +101,7 @@ class TranscriptionScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
 
-                // Status indicator
+                // Status indicator with Overflow Fix
                 Center(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -111,20 +116,28 @@ class TranscriptionScreen extends StatelessWidget {
                             color: controller.isRecording
                                 ? Colors.red
                                 : controller.state == TranscriptionState.processing
-                                ? Colors.blue
-                                : Colors.amber,
+                                    ? Colors.blue
+                                    : Colors.amber,
                           ),
                         ),
-                      Text(
-                        _statusDetailText(controller),
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white),
+                      // FIX: Wrapped in Expanded to prevent the 174px right overflow
+                      Expanded(
+                        child: Text(
+                          _statusDetailText(controller),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16, 
+                            fontWeight: FontWeight.w500, 
+                            color: Colors.white
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 40),
 
-                // Navigation buttons
+                // Navigation buttons with Compilation Fix
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -145,11 +158,14 @@ class TranscriptionScreen extends StatelessWidget {
                         )),
                       ),
                       const SizedBox(height: 16),
+                      // FIX: Using controller.medicines instead of controller.prescription
                       _buildNavigationButton(
                         context, 'Prescription', Icons.medication,
-                        controller.prescription.isNotEmpty,
+                        controller.medicines.isNotEmpty,
                         () => Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => PrescriptionScreen(prescription: controller.prescription),
+                          builder: (_) => PrescriptionScreen(
+                            prescription: controller.medicines.join(", "),
+                          ),
                         )),
                       ),
                     ],
@@ -193,25 +209,15 @@ class TranscriptionScreen extends StatelessWidget {
   ) {
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton(
-        onPressed: isEnabled ? onPressed : null,
+      child: ElevatedButton.icon(
+        icon: Icon(icon, color: Colors.deepPurple),
+        label: Text(title, style: const TextStyle(fontSize: 16, color: Colors.black87)),
         style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.deepPurple,
-          disabledBackgroundColor: Colors.white.withOpacity(0.3),
-          disabledForegroundColor: Colors.white.withOpacity(0.5),
-          elevation: isEnabled ? 4 : 0,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          backgroundColor: isEnabled ? Colors.white : Colors.white24,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 24),
-            const SizedBox(width: 12),
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
-        ),
+        onPressed: isEnabled ? onPressed : null,
       ),
     );
   }
