@@ -1,5 +1,5 @@
-# Uncomment this line to define a global platform for your project
-# platform :ios, '12.0'
+# iOS minimum version - Firebase 12.9+ requires iOS 15+
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -29,7 +29,6 @@ flutter_ios_podfile_setup
 
 target 'Runner' do
   use_frameworks!
-  use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
@@ -40,5 +39,31 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      # Set iOS deployment target
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+
+      # Disable bitcode (deprecated)
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
+
+      # Suppress warnings
+      config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+      config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
+
+      # Simulator-only: avoid CodeSign failures on pod frameworks caused by macOS metadata attributes.
+      # This does not affect Runner/device signing.
+      config.build_settings['CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]'] = 'NO'
+      config.build_settings['CODE_SIGNING_REQUIRED[sdk=iphonesimulator*]'] = 'NO'
+    end
+
+    # Fix leveldb-library header search path for Xcode 26.2+
+    if target.name == 'leveldb-library'
+      target.build_configurations.each do |config|
+        config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
+        unless config.build_settings['HEADER_SEARCH_PATHS'].include?('${PODS_ROOT}/leveldb-library')
+          config.build_settings['HEADER_SEARCH_PATHS'] << '${PODS_ROOT}/leveldb-library'
+        end
+      end
+    end
   end
 end
