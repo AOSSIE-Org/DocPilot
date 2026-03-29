@@ -6,9 +6,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../data/deepgram_service.dart';
+import '../data/local_storage_service.dart';
 import '../data/gemini_service.dart';
 import '../domain/transcription_model.dart';
 import '../domain/medical_insights.dart';
+import '../domain/transcription_history_model.dart';
 
 enum TranscriptionState { idle, recording, transcribing, processing, done, error }
 
@@ -16,6 +18,7 @@ class TranscriptionController extends ChangeNotifier {
   final _audioRecorder = AudioRecorder();
   final _deepgramService = DeepgramService();
   final _geminiService = GeminiService();
+  final _localStorageService = LocalStorageService();
 
   TranscriptionState state = TranscriptionState.idle;
   TranscriptionModel data = const TranscriptionModel();
@@ -122,6 +125,17 @@ class TranscriptionController extends ChangeNotifier {
       final MedicalInsights insights =
           await _geminiService.generateInsights(transcript);
       data = data.copyWith(insights: insights);
+
+      final historyItem = TranscriptionHistoryModel(
+        transcript: transcript,
+        summary: insights.summary,
+        symptoms: insights.symptoms,
+        medicines: insights.medicines,
+        createdAt: DateTime.now(),
+      );
+
+      await _localStorageService.save(historyItem);
+      
       state = TranscriptionState.done;
       notifyListeners();
       developer.log('Gemini structured insights generated');
