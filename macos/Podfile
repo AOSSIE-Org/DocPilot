@@ -1,4 +1,4 @@
-platform :osx, '10.14'
+platform :osx, '10.15'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -39,5 +39,19 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_macos_build_settings(target)
+    target.build_configurations.each do |config|
+      # Disable code signing for debug builds to avoid native_assets xattr issues
+      if config.name == 'Debug'
+        config.build_settings['CODE_SIGN_IDENTITY'] = ''
+        config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+      end
+    end
+  end
+
+  # Clean extended attributes from frameworks
+  puts 'Cleaning framework extended attributes...'
+  Dir.glob('Pods/**/*.framework').each do |framework|
+    system("xattr -c -r '#{framework}' 2>/dev/null || true")
   end
 end
