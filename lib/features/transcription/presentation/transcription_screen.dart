@@ -152,7 +152,7 @@ class TranscriptionScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // Empty State (FIXED: Removed period to match controller sentinel)
+                // Empty State (FIXED: No period in sentinel string)
                 if (controller.state == TranscriptionState.done &&
                     (controller.transcription.isEmpty || 
                      controller.transcription == "No speech detected"))
@@ -273,7 +273,6 @@ class TranscriptionScreen extends StatelessWidget {
     );
   }
 
-  // FIXED: Explicitly handles .done and removed duplicate switch cases
   String _statusText(TranscriptionState state) {
     switch (state) {
       case TranscriptionState.recording:
@@ -281,7 +280,7 @@ class TranscriptionScreen extends StatelessWidget {
       case TranscriptionState.transcribing:
         return 'Transcribing...';
       case TranscriptionState.processing:
-        return 'Analyzing with AI...';
+        return 'Processing with Gemini...';
       case TranscriptionState.done:
         return 'Analysis ready';
       case TranscriptionState.error:
