@@ -7,11 +7,7 @@ import 'package:provider/provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await dotenv.load(fileName: '.env');
-  } catch (_) {
-    // Allow app startup for web/preview environments where .env is unavailable.
-  }
+  await dotenv.load(fileName: '.env', isOptional: true);
   runApp(const MyApp());
 }
 
