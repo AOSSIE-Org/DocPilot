@@ -1,6 +1,6 @@
-import 'package:doc_pilot_new_app_gradel_fix/screens/prescription_screen.dart';
 import 'package:doc_pilot_new_app_gradel_fix/screens/summary_screen.dart';
 import 'package:doc_pilot_new_app_gradel_fix/screens/transcription_detail_screen.dart';
+import 'package:doc_pilot_new_app_gradel_fix/screens/medical_insights_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'transcription_controller.dart';
@@ -10,7 +10,6 @@ class TranscriptionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Listen to changes in the controller
     final controller = context.watch<TranscriptionController>();
 
     return Scaffold(
@@ -34,19 +33,21 @@ class TranscriptionScreen extends StatelessWidget {
                 const Text(
                   'DocPilot',
                   style: TextStyle(
-                    fontSize: 28, 
-                    fontWeight: FontWeight.bold, 
-                    color: Colors.white
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 8),
+
                 Text(
                   _statusText(controller.state),
                   style: const TextStyle(fontSize: 16, color: Colors.white70),
                 ),
+
                 const SizedBox(height: 30),
 
-                // Waveform Display
+                // 🎧 Waveform
                 SizedBox(
                   height: 100,
                   child: Row(
@@ -62,7 +63,12 @@ class TranscriptionScreen extends StatelessWidget {
                           height: value * 80 + 5,
                           decoration: BoxDecoration(
                             color: controller.isRecording
-                                ? HSLColor.fromAHSL(1.0, (280 + index * 2) % 360, 0.8, 0.7 + value * 0.2).toColor()
+                                ? HSLColor.fromAHSL(
+                                    1.0,
+                                    (280 + index * 2) % 360,
+                                    0.8,
+                                    0.7 + value * 0.2,
+                                  ).toColor()
                                 : Colors.white.withOpacity(0.5),
                             borderRadius: BorderRadius.circular(5),
                           ),
@@ -71,38 +77,48 @@ class TranscriptionScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 40),
 
-                // Mic button
+                // 🎤 Mic Button
                 Center(
                   child: GestureDetector(
                     onTap: controller.isProcessing ? null : controller.toggleRecording,
-                    child: Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: controller.isRecording ? Colors.red : Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: (controller.isRecording ? Colors.red : Colors.white).withOpacity(0.3),
-                            spreadRadius: 8,
-                            blurRadius: 20,
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        controller.isRecording ? Icons.stop : Icons.mic,
-                        size: 50,
-                        color: controller.isRecording ? Colors.white : Colors.deepPurple.shade800,
+                    child: AnimatedScale(
+                      scale: controller.isRecording ? 1.2 : 1.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: controller.isRecording ? Colors.red : Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: (controller.isRecording ? Colors.red : Colors.white)
+                                  .withOpacity(0.3),
+                              spreadRadius: 8,
+                              blurRadius: 20,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          controller.isRecording ? Icons.stop : Icons.mic,
+                          size: 50,
+                          color: controller.isRecording
+                              ? Colors.white
+                              : Colors.deepPurple.shade800,
+                        ),
                       ),
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 20),
 
-                // Status indicator with Overflow Fix
-                Center(
+                // 🔥 Status Row (FIXED)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -110,7 +126,7 @@ class TranscriptionScreen extends StatelessWidget {
                         Container(
                           width: 16,
                           height: 16,
-                          margin: const EdgeInsets.only(right: 8.0),
+                          margin: const EdgeInsets.only(right: 8),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: controller.isRecording
@@ -120,53 +136,90 @@ class TranscriptionScreen extends StatelessWidget {
                                     : Colors.amber,
                           ),
                         ),
-                      // FIX: Wrapped in Expanded to prevent the 174px right overflow
                       Expanded(
                         child: Text(
                           _statusDetailText(controller),
                           textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 16, 
-                            fontWeight: FontWeight.w500, 
-                            color: Colors.white
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 40),
 
-                // Navigation buttons with Compilation Fix
+                const SizedBox(height: 20),
+
+                // 🧠 Empty State
+                if (controller.state == TranscriptionState.done &&
+                    controller.transcription.isEmpty)
+                  const Center(
+                    child: Text(
+                      "No speech detected. Try again.",
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ),
+
+                const SizedBox(height: 20),
+
+                // 🚀 Navigation Buttons
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       _buildNavigationButton(
-                        context, 'Transcription', Icons.record_voice_over,
-                        controller.transcription.isNotEmpty,
-                        () => Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => TranscriptionDetailScreen(transcription: controller.transcription),
-                        )),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildNavigationButton(
-                        context, 'Summary', Icons.summarize,
-                        controller.summary.isNotEmpty,
-                        () => Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => SummaryScreen(summary: controller.summary),
-                        )),
-                      ),
-                      const SizedBox(height: 16),
-                      // FIX: Using controller.medicines instead of controller.prescription
-                      _buildNavigationButton(
-                        context, 'Prescription', Icons.medication,
-                        controller.medicines.isNotEmpty,
-                        () => Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => PrescriptionScreen(
-                            prescription: controller.medicines.join(", "),
+                        context,
+                        'Transcription',
+                        Icons.record_voice_over,
+                        controller.transcription.isNotEmpty && !controller.isProcessing,
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => TranscriptionDetailScreen(
+                              transcription: controller.transcription,
+                            ),
                           ),
-                        )),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      _buildNavigationButton(
+                        context,
+                        'Summary',
+                        Icons.summarize,
+                        controller.summary.isNotEmpty && !controller.isProcessing,
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SummaryScreen(
+                              summary: controller.summary,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ✅ NEW: Medical Insights Screen
+                      _buildNavigationButton(
+                        context,
+                        'Medical Insights',
+                        Icons.medical_services,
+                        controller.medicines.isNotEmpty && !controller.isProcessing,
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => MedicalInsightsScreen(
+                              symptoms: controller.symptoms,
+                              medicines: controller.medicines,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -181,22 +234,33 @@ class TranscriptionScreen extends StatelessWidget {
 
   String _statusText(TranscriptionState state) {
     switch (state) {
-      case TranscriptionState.recording:    return 'Recording your voice...';
-      case TranscriptionState.transcribing: return 'Transcribing your voice...';
-      case TranscriptionState.processing:   return 'Processing with Gemini...';
-      case TranscriptionState.error:        return 'Something went wrong';
-      default:                              return 'Tap the mic to begin';
+      case TranscriptionState.recording:
+        return 'Recording your voice...';
+      case TranscriptionState.transcribing:
+        return 'Transcribing your voice...';
+      case TranscriptionState.processing:
+        return 'Processing with AI...';
+      case TranscriptionState.error:
+        return 'Something went wrong';
+      default:
+        return 'Tap the mic to begin';
     }
   }
 
   String _statusDetailText(TranscriptionController controller) {
     switch (controller.state) {
-      case TranscriptionState.recording:    return 'Recording in progress';
-      case TranscriptionState.transcribing: return 'Processing audio...';
-      case TranscriptionState.processing:   return 'Generating content with Gemini...';
-      case TranscriptionState.done:         return 'Ready to view results';
-      case TranscriptionState.error:        return controller.errorMessage ?? 'Error occurred';
-      default:                              return 'Press the microphone button to start';
+      case TranscriptionState.recording:
+        return 'Recording in progress';
+      case TranscriptionState.transcribing:
+        return 'Processing audio...';
+      case TranscriptionState.processing:
+        return 'Generating insights...';
+      case TranscriptionState.done:
+        return 'Ready to view results';
+      case TranscriptionState.error:
+        return controller.errorMessage ?? 'Error occurred';
+      default:
+        return 'Press the microphone button to start';
     }
   }
 
@@ -211,11 +275,16 @@ class TranscriptionScreen extends StatelessWidget {
       width: double.infinity,
       child: ElevatedButton.icon(
         icon: Icon(icon, color: Colors.deepPurple),
-        label: Text(title, style: const TextStyle(fontSize: 16, color: Colors.black87)),
+        label: Text(
+          title,
+          style: const TextStyle(fontSize: 16, color: Colors.black87),
+        ),
         style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(vertical: 16),
           backgroundColor: isEnabled ? Colors.white : Colors.white24,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
         onPressed: isEnabled ? onPressed : null,
       ),
