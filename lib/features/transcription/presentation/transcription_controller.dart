@@ -5,9 +5,11 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:permission_handler/permission_handler.dart';
+
 import '../data/deepgram_service.dart';
 import '../data/gemini_service.dart';
 import '../domain/transcription_model.dart';
+import '../domain/medical_insights.dart';
 
 enum TranscriptionState { idle, recording, transcribing, processing, done, error }
 
@@ -21,25 +23,27 @@ class TranscriptionController extends ChangeNotifier {
   String? errorMessage;
   String _recordingPath = '';
 
-  // Waveform — kept here since it's driven by recording state
+  // Waveform
   final List<double> waveformValues = List.filled(40, 0.0);
   Timer? _waveformTimer;
 
   bool get isRecording => state == TranscriptionState.recording;
+
   bool get isProcessing =>
       state == TranscriptionState.transcribing ||
       state == TranscriptionState.processing;
 
   String get transcription => data.rawTranscript;
-  String get summary => data.summary;
-  String get prescription => data.prescription;
+
+  // ✅ NEW STRUCTURED GETTERS
+  String get summary => data.insights?.summary ?? '';
+  List<String> get symptoms => data.insights?.symptoms ?? [];
+  List<String> get medicines => data.insights?.medicines ?? [];
 
   Future<bool> requestPermissions() async {
     final status = await Permission.microphone.request();
 
-    if (status.isGranted) {
-      return true;
-    }
+    if (status.isGranted) return true;
 
     if (status.isPermanentlyDenied) {
       _setError('Microphone permission permanently denied. Please enable it in settings.');
@@ -62,9 +66,7 @@ class TranscriptionController extends ChangeNotifier {
     try {
       if (!await _audioRecorder.hasPermission()) {
         final granted = await requestPermissions();
-        if (!granted) {
-          return;
-        }
+        if (!granted) return;
       }
 
       final directory = await getTemporaryDirectory();
@@ -80,7 +82,6 @@ class TranscriptionController extends ChangeNotifier {
         path: _recordingPath,
       );
 
-      // Reset previous data
       data = const TranscriptionModel();
       state = TranscriptionState.recording;
       _startWaveformAnimation();
@@ -127,16 +128,17 @@ class TranscriptionController extends ChangeNotifier {
     }
   }
 
+  // ✅ UPDATED: Structured AI Processing
   Future<void> _processWithGemini(String transcript) async {
     try {
-      final summary = await _geminiService.generateSummary(transcript);
-      final prescription = await _geminiService.generatePrescription(transcript);
+      final MedicalInsights insights =
+          await _geminiService.generateInsights(transcript);
 
-      data = data.copyWith(summary: summary, prescription: prescription);
+      data = data.copyWith(insights: insights);
       state = TranscriptionState.done;
       notifyListeners();
 
-      developer.log('Gemini processing complete');
+      developer.log('Gemini structured insights generated');
     } catch (e) {
       _setError('Gemini error: $e');
     }

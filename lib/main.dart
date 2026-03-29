@@ -6,9 +6,17 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
 Future<void> main() async {
-  await dotenv.load();
+  WidgetsFlutterBinding.ensureInitialized(); 
+  
+  try {
+    await dotenv.load(fileName: ".env").timeout(const Duration(seconds: 2));
+  } catch (e) {
+    debugPrint("Warning: Could not load .env file: $e");
+  }
+  
   runApp(const MyApp());
 }
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
