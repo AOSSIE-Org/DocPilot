@@ -44,3 +44,17 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Android release signing (MUST NOT commit)
+android/key.properties
+*.jks
+*.keystore
+
+# Firebase credentials (MUST NOT commit)
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+
+# API keys and secrets
+.env.local
+.env.production
+.secrets/
