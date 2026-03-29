@@ -39,15 +39,13 @@ class TranscriptionScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-
                 Text(
                   _statusText(controller.state),
                   style: const TextStyle(fontSize: 16, color: Colors.white70),
                 ),
-
                 const SizedBox(height: 30),
 
-                //  Waveform
+                // Waveform
                 SizedBox(
                   height: 100,
                   child: Row(
@@ -80,7 +78,7 @@ class TranscriptionScreen extends StatelessWidget {
 
                 const SizedBox(height: 40),
 
-                //  Mic Button
+                // Mic Button
                 Center(
                   child: GestureDetector(
                     onTap: controller.isProcessing ? null : controller.toggleRecording,
@@ -116,7 +114,7 @@ class TranscriptionScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                //  Status Row
+                // Status Row
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Row(
@@ -154,7 +152,7 @@ class TranscriptionScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                //  Empty State
+                // Empty State
                 if (controller.state == TranscriptionState.done &&
                     (controller.transcription.isEmpty || 
                      controller.transcription == "No speech detected."))
@@ -167,7 +165,7 @@ class TranscriptionScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                //  Navigation Buttons
+                // Navigation Buttons
                 Expanded(
                   child: ListView(
                     children: [
@@ -203,6 +201,7 @@ class TranscriptionScreen extends StatelessWidget {
 
                       const SizedBox(height: 12),
 
+                      // FIXED: Passing correct List<String> parameters to MedicalInsightsScreen
                       _buildNavigationButton(
                         context,
                         'Medical Insights',
@@ -211,7 +210,10 @@ class TranscriptionScreen extends StatelessWidget {
                         () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => MedicalInsightsScreen(summary: controller.summary),
+                            builder: (_) => MedicalInsightsScreen(
+                              symptoms: controller.symptoms,
+                              medicines: controller.medicines,
+                            ),
                           ),
                         ),
                       ),
@@ -272,15 +274,14 @@ class TranscriptionScreen extends StatelessWidget {
     );
   }
 
-  // FIXED: Explicitly handles .done and removed duplicate code
   String _statusText(TranscriptionState state) {
     switch (state) {
       case TranscriptionState.recording:
         return 'Recording your voice...';
       case TranscriptionState.transcribing:
-        return 'Transcribing your voice...';
+        return 'Transcribing...';
       case TranscriptionState.processing:
-        return 'Processing with AI...';
+        return 'Analyzing with AI...';
       case TranscriptionState.done:
         return 'Analysis ready';
       case TranscriptionState.error:
@@ -292,8 +293,9 @@ class TranscriptionScreen extends StatelessWidget {
 
   String _statusDetailText(TranscriptionController controller) {
     if (controller.isRecording) return 'Recording in progress...';
-    if (controller.state == TranscriptionState.processing) return 'Converting speech to text...';
-    if (controller.state == TranscriptionState.summarizing) return 'Analyzing medical content...';
+    // FIXED: Adjusted to use existing enum states (transcribing -> processing)
+    if (controller.state == TranscriptionState.transcribing) return 'Converting speech to text...';
+    if (controller.state == TranscriptionState.processing) return 'Extracting medical insights...';
     if (controller.state == TranscriptionState.done) return 'Review your insights below';
     return 'Tap the microphone to begin';
   }
