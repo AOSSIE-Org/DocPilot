@@ -11,10 +11,19 @@ class MedicalInsights {
 
   factory MedicalInsights.fromJson(Map<String, dynamic> json) {
     return MedicalInsights(
-      summary: json['summary'] ?? '',
-      symptoms: List<String>.from(json['symptoms'] ?? []),
-      medicines: List<String>.from(json['medicines'] ?? []),
+      summary: json['summary']?.toString() ?? '',
+      
+      symptoms: _parseList(json['symptoms']),
+      medicines: _parseList(json['medicines']),
     );
+  }
+
+  static List<String> _parseList(dynamic jsonValue) {
+    if (jsonValue is! List) return [];
+    return jsonValue
+        .where((item) => item != null)
+        .map((item) => item.toString())
+        .toList();
   }
 
   Map<String, dynamic> toJson() {
