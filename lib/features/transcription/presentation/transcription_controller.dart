@@ -24,6 +24,10 @@ class TranscriptionController extends ChangeNotifier {
   String? errorMessage;
   String _recordingPath = '';
 
+  // FIXED: Declared missing waveform fields
+  final List<double> waveformValues = List.filled(40, 0.0);
+  Timer? _waveformTimer;
+
   bool get isRecording => state == TranscriptionState.recording;
 
   // UI Helper Getters
@@ -63,11 +67,16 @@ class TranscriptionController extends ChangeNotifier {
   }
 
   Future<void> _processWithGemini(String transcript) async {
+    if (transcript.isEmpty || transcript == "No speech detected") {
+      state = TranscriptionState.idle;
+      notifyListeners();
+      return;
+    }
+
     state = TranscriptionState.processing;
     notifyListeners();
 
     try {
-      // GeminiService only has generateInsights; we derive summary from it.
       final insights = await _geminiService.generateInsights(transcript);
       
       data = data.copyWith(
@@ -100,9 +109,9 @@ class TranscriptionController extends ChangeNotifier {
   }
 
   void checkConfigStatus(bool isLoaded) {
-  if (!isLoaded) {
-    _setError('Configuration Error: API keys could not be loaded. Please check your .env file.');
-  }
+    if (!isLoaded) {
+      _setError('Configuration Error: API keys could not be loaded. Please check your .env file.');
+    }
   }
   
   @override
@@ -112,5 +121,3 @@ class TranscriptionController extends ChangeNotifier {
     super.dispose();
   }
 }
-
-
