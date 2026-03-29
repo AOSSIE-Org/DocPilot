@@ -11,14 +11,8 @@ class DeepgramService {
 
   String _resolveApiKey() {
     final configuredKey = _apiKey;
-    if (configuredKey != null && configuredKey.isNotEmpty) {
-      return configuredKey;
-    }
-    try {
-      return (dotenv.env['DEEPGRAM_API_KEY'] ?? '').trim();
-    } catch (_) {
-      return '';
-    }
+    if (configuredKey != null && configuredKey.isNotEmpty) return configuredKey;
+    return (dotenv.env['DEEPGRAM_API_KEY'] ?? '').trim();
   }
 
   Future<http.Response> _retryPost({
@@ -27,6 +21,8 @@ class DeepgramService {
     required List<int> body,
     int retries = 3,
   }) async {
+    http.Response? lastResponse;
+
     for (int attempt = 0; attempt < retries; attempt++) {
       try {
         final response = await http
@@ -35,20 +31,29 @@ class DeepgramService {
 
         if (response.statusCode == 200) return response;
 
+        lastResponse = response;
+
         if (response.statusCode >= 500) {
           await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
           continue;
         } else {
-          throw Exception('Deepgram failed: ${response.statusCode} - ${response.body}');
+          throw Exception('Deepgram error (${response.statusCode}): ${response.body}');
         }
       } on TimeoutException {
-        if (attempt == retries - 1) throw Exception('Request timed out');
+        if (attempt == retries - 1) throw Exception('Deepgram request timed out');
+      } on Exception {
+        rethrow;
       } catch (e) {
         if (attempt == retries - 1) rethrow;
       }
+      
       await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
     }
-    throw Exception('Failed after $retries retries');
+
+    throw Exception(
+      'Deepgram failed after $retries attempts. '
+      'Last status: ${lastResponse?.statusCode ?? "Unknown"}'
+    );
   }
 
   Future<String> transcribe(String recordingPath) async {
@@ -76,24 +81,11 @@ class DeepgramService {
   String _parseTranscript(String responseBody) {
     try {
       final decoded = json.decode(responseBody);
-
-      if (decoded is! Map<String, dynamic>) {
-        return 'No speech detected';
-      }
-
-      final results = decoded['results'];
-      final channels = results?['channels'];
+      final transcript = decoded['results']?['channels']?[0]?['alternatives']?[0]?['transcript'];
       
-      if (channels is List && channels.isNotEmpty) {
-        final alternatives = channels[0]['alternatives'];
-        if (alternatives is List && alternatives.isNotEmpty) {
-          final transcript = alternatives[0]['transcript'];
-          if (transcript is String && transcript.trim().isNotEmpty) {
-            return transcript.trim();
-          }
-        }
+      if (transcript is String && transcript.trim().isNotEmpty) {
+        return transcript.trim();
       }
-
       return 'No speech detected';
     } catch (e) {
       throw Exception('Failed to parse Deepgram response: $e');
