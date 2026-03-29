@@ -11,73 +11,84 @@ class DeepgramService {
 
   String _resolveApiKey() {
     final configuredKey = _apiKey;
-    if (configuredKey != null && configuredKey.isNotEmpty) {
-      return configuredKey;
+    if (configuredKey != null && configuredKey.isNotEmpty) return configuredKey;
+    return (dotenv.env['DEEPGRAM_API_KEY'] ?? '').trim();
+  }
+
+  Future<http.Response> _retryPost({
+    required Uri uri,
+    required Map<String, String> headers,
+    required List<int> body,
+    int retries = 3,
+  }) async {
+    http.Response? lastResponse;
+
+    for (int attempt = 0; attempt < retries; attempt++) {
+      try {
+        final response = await http
+            .post(uri, headers: headers, body: body)
+            .timeout(const Duration(seconds: 30));
+
+        if (response.statusCode == 200) return response;
+
+        lastResponse = response;
+
+        if (response.statusCode >= 500) {
+          await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
+          continue;
+        } else {
+          throw Exception('Deepgram error (${response.statusCode}): ${response.body}');
+        }
+      } on TimeoutException {
+        if (attempt == retries - 1) throw Exception('Deepgram request timed out');
+      } on Exception {
+        rethrow;
+      } catch (e) {
+        if (attempt == retries - 1) rethrow;
+      }
+      
+      await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
     }
 
-    try {
-      return (dotenv.env['DEEPGRAM_API_KEY'] ?? '').trim();
-    } catch (_) {
-      return '';
-    }
+    throw Exception(
+      'Deepgram failed after $retries attempts. '
+      'Last status: ${lastResponse?.statusCode ?? "Unknown"}'
+    );
   }
 
   Future<String> transcribe(String recordingPath) async {
     final apiKey = _resolveApiKey();
-    if (apiKey.isEmpty) {
-      throw Exception('Missing DEEPGRAM_API_KEY in environment');
-    }
-
-    final uri = Uri.parse('https://api.deepgram.com/v1/listen?model=nova-2');
+    if (apiKey.isEmpty) throw Exception('Missing DEEPGRAM_API_KEY');
 
     final file = File(recordingPath);
-    if (!await file.exists()) {
-      throw Exception('Recording file not found');
-    }
+    if (!await file.exists()) throw Exception('Recording file not found');
 
     final bytes = await file.readAsBytes();
+    final uri = Uri.parse('https://api.deepgram.com/v1/listen?model=nova-2&punctuate=true&smart_format=true');
 
-    http.Response response;
+    final response = await _retryPost(
+      uri: uri,
+      headers: {
+        'Authorization': 'Token $apiKey',
+        'Content-Type': 'application/octet-stream',
+      },
+      body: bytes,
+    );
+
+    return _parseTranscript(response.body);
+  }
+
+  String _parseTranscript(String responseBody) {
     try {
-      response = await http.post(
-        uri,
-        headers: {
-          'Authorization': 'Token $apiKey',
-          'Content-Type': 'audio/m4a',
-        },
-        body: bytes,
-      ).timeout(const Duration(seconds: 30));
-    } on TimeoutException {
-      throw Exception('Deepgram request timed out after 30 seconds');
-    }
-
-    if (response.statusCode == 200) {
-      final decodedResponse = json.decode(response.body);
-
-      if (decodedResponse is! Map<String, dynamic>) {
-        throw Exception('Deepgram returned unexpected response format');
+      final decoded = json.decode(responseBody);
+      final transcript = decoded['results']?['channels']?[0]?['alternatives']?[0]?['transcript'];
+      
+      if (transcript is String && transcript.trim().isNotEmpty) {
+        return transcript.trim();
       }
-
-      final results = decodedResponse['results'];
-      if (results is! Map<String, dynamic>) {
-        return 'No speech detected';
-      }
-
-      final channels = results['channels'];
-      if (channels is! List || channels.isEmpty || channels.first is! Map<String, dynamic>) {
-        return 'No speech detected';
-      }
-
-      final alternatives = (channels.first as Map<String, dynamic>)['alternatives'];
-      if (alternatives is! List || alternatives.isEmpty || alternatives.first is! Map<String, dynamic>) {
-        return 'No speech detected';
-      }
-
-      final transcript = (alternatives.first as Map<String, dynamic>)['transcript'];
-      final result = transcript is String ? transcript.trim() : '';
-      return result.isNotEmpty ? result : 'No speech detected';
-    } else {
-      throw Exception('Deepgram failed: ${response.statusCode}');
+      return 'No speech detected';
+    } catch (e) {
+      throw Exception('Failed to parse Deepgram response: $e');
     }
   }
 }

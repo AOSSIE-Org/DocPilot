@@ -1,23 +1,40 @@
-class TranscriptionModel {
-  final String rawTranscript;
-  final String summary;
-  final String prescription;
+import 'medical_insights.dart';
 
-  const TranscriptionModel({
-    this.rawTranscript = '',
-    this.summary = '',
-    this.prescription = '',
+class TranscriptionHistoryModel {
+  final String transcript;
+  final String summary;
+  final List<String> symptoms;
+  final List<String> medicines;
+  final DateTime createdAt;
+
+  const TranscriptionHistoryModel({
+    required this.transcript,
+    required this.summary,
+    required this.symptoms,
+    required this.medicines,
+    required this.createdAt,
   });
 
-  TranscriptionModel copyWith({
-    String? rawTranscript,
-    String? summary,
-    String? prescription,
-  }) {
-    return TranscriptionModel(
-      rawTranscript: rawTranscript ?? this.rawTranscript,
-      summary: summary ?? this.summary,
-      prescription: prescription ?? this.prescription,
+  factory TranscriptionHistoryModel.fromJson(Map<String, dynamic> json) {
+    return TranscriptionHistoryModel(
+      transcript: json['transcript'] ?? '',
+      summary: json['summary'] ?? '',
+      // FIXED: Use null-coalescing and casting to prevent crashes on missing lists
+      symptoms: (json['symptoms'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      medicines: (json['medicines'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      createdAt: json['createdAt'] != null 
+          ? DateTime.parse(json['createdAt']) 
+          : DateTime.now(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'transcript': transcript,
+      'summary': summary,
+      'symptoms': symptoms,
+      'medicines': medicines,
+      'createdAt': createdAt.toIso8601String(),
+    };
   }
 }
