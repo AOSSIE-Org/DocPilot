@@ -1,30 +1,37 @@
 import 'dart:async';
-import 'package:doc_pilot_new_app_gradel_fix/features/transcription/presentation/transcription_controller.dart';
-import 'package:doc_pilot_new_app_gradel_fix/features/transcription/presentation/transcription_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
+import 'features/transcription/presentation/transcription_controller.dart';
+import 'features/transcription/presentation/transcription_screen.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized(); 
   
+  bool isConfigLoaded = false;
   try {
+    // Attempt to load environment variables
     await dotenv.load(fileName: ".env").timeout(const Duration(seconds: 2));
+    isConfigLoaded = true;
   } catch (e) {
-    debugPrint("Warning: Could not load .env file: $e");
+    debugPrint("Critical: Could not load .env file: $e");
+    // We proceed to runApp so we can show a user-friendly error in the UI
   }
   
-  runApp(const MyApp());
+  runApp(MyApp(isConfigLoaded: isConfigLoaded));
 }
 
-
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool isConfigLoaded;
+  
+  const MyApp({super.key, required this.isConfigLoaded});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => TranscriptionController(),
+      // Pass the config status to the controller so it can show an alert
+      create: (_) => TranscriptionController()..checkConfigStatus(isConfigLoaded),
       child: MaterialApp(
         title: 'DocPilot',
         theme: ThemeData(

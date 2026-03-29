@@ -151,6 +151,12 @@ class TranscriptionController extends ChangeNotifier {
     notifyListeners();
     developer.log(message);
   }
+
+  void checkConfigStatus(bool isLoaded) {
+  if (!isLoaded) {
+    _setError('Configuration Error: API keys could not be loaded. Please check your .env file.');
+  }
+  }
   
   @override
   void dispose() {

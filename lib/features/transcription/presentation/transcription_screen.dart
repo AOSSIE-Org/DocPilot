@@ -47,7 +47,7 @@ class TranscriptionScreen extends StatelessWidget {
 
                 const SizedBox(height: 30),
 
-                // 🎧 Waveform
+                //  Waveform
                 SizedBox(
                   height: 100,
                   child: Row(
@@ -80,7 +80,7 @@ class TranscriptionScreen extends StatelessWidget {
 
                 const SizedBox(height: 40),
 
-                // 🎤 Mic Button
+                //  Mic Button
                 Center(
                   child: GestureDetector(
                     onTap: controller.isProcessing ? null : controller.toggleRecording,
@@ -116,7 +116,7 @@ class TranscriptionScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // 🔥 Status Row (FIXED)
+                //  Status Row (FIXED)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Row(
@@ -167,63 +167,58 @@ class TranscriptionScreen extends StatelessWidget {
                 const SizedBox(height: 20),
 
                 // 🚀 Navigation Buttons
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildNavigationButton(
-                        context,
-                        'Transcription',
-                        Icons.record_voice_over,
-                        controller.transcription.isNotEmpty && !controller.isProcessing,
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => TranscriptionDetailScreen(
-                              transcription: controller.transcription,
-                            ),
-                          ),
-                        ),
-                      ),
+Expanded(
+  child: ListView(
+    children: [
+      // 1. Summary Button
+      _buildNavigationButton(
+        context,
+        'Summary',
+        Icons.description,
+        controller.summary.isNotEmpty && !controller.isProcessing,
+        () => Navigator.push(
+          context, 
+          MaterialPageRoute(builder: (_) => SummaryScreen(summary: controller.summary))
+        ),
+      ),
+      
+      const SizedBox(height: 12),
 
-                      const SizedBox(height: 16),
+      // 2. Prescription Button (Legacy Adapter)
+      _buildNavigationButton(
+        context,
+        'Prescription',
+        Icons.medication,
+        controller.prescription.isNotEmpty && !controller.isProcessing,
+        () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => PrescriptionScreen(prescription: controller.prescription)),
+        ),
+      ),
 
-                      _buildNavigationButton(
-                        context,
-                        'Summary',
-                        Icons.summarize,
-                        controller.summary.isNotEmpty && !controller.isProcessing,
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => SummaryScreen(
-                              summary: controller.summary,
-                            ),
-                          ),
-                        ),
-                      ),
+      const SizedBox(height: 12),
 
-                      const SizedBox(height: 16),
+      // 3. Medical Insights Button (FIXED LOGIC)
+      _buildNavigationButton(
+        context,
+        'Medical Insights',
+        Icons.medical_services,
+        // ✅ Enable if EITHER symptoms or medicines are found
+        (controller.symptoms.isNotEmpty || controller.medicines.isNotEmpty) && !controller.isProcessing,
+        () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MedicalInsightsScreen(
+              symptoms: controller.symptoms,
+              medicines: controller.medicines,
+            ),
+          ),
+        ),
+      ),
+    ],
+  ),
+),
 
-                      // ✅ NEW: Medical Insights Screen
-                      _buildNavigationButton(
-                        context,
-                        'Medical Insights',
-                        Icons.medical_services,
-                        controller.medicines.isNotEmpty && !controller.isProcessing,
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => MedicalInsightsScreen(
-                              symptoms: controller.symptoms,
-                              medicines: controller.medicines,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
