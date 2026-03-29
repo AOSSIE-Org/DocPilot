@@ -42,7 +42,11 @@ class TranscriptionController extends ChangeNotifier {
 
   Future<void> _startRecording() async {
     try {
-      if (!await _audioRecorder.hasPermission()) return;
+      if (!await _audioRecorder.hasPermission()) {
+        // FIXED: Provide user feedback instead of failing silently
+        _setError("Microphone permission is required to record audio.");
+        return;
+      }
       final dir = await getTemporaryDirectory();
       _recordingPath = '${dir.path}/rec_${DateTime.now().millisecondsSinceEpoch}.m4a';
       
@@ -56,7 +60,11 @@ class TranscriptionController extends ChangeNotifier {
   Future<void> _stopRecording() async {
     try {
       final path = await _audioRecorder.stop();
-      if (path == null) return;
+      if (path == null) {
+        state = TranscriptionState.idle;
+        notifyListeners();
+        return;
+      }
       
       state = TranscriptionState.transcribing;
       notifyListeners();
