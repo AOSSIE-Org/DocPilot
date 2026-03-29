@@ -1,4 +1,4 @@
-package com.example.doc_pilot_new_app_gradel_fix
+package com.sisir.docpilot
 
 import io.flutter.embedding.android.FlutterActivity
 

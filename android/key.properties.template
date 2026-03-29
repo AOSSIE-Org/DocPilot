@@ -1,0 +1,25 @@
+# Android Release Signing Configuration Template
+# INSTRUCTIONS:
+# 1. Copy this file to: android/key.properties
+# 2. Generate a keystore (if you don't have one):
+#    keytool -genkey -v -keystore my-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias my-key-alias
+#
+# 3. Fill in the values below with your keystore information
+# 4. IMPORTANT: Never commit key.properties to version control!
+#    It's already in .gitignore but double-check before committing.
+#
+# 5. Store this file securely - consider using a password manager or CI/CD secrets
+# 6. For GitHub Actions, use secrets: https://docs.github.com/en/actions/security-guides/encrypted-secrets
+
+# Keystore file path (relative to android/ directory or absolute)
+# Example: storeFile=/Users/username/my-release-key.jks
+storeFile=
+
+# Keystore password (the password you set when creating the keystore)
+storePassword=
+
+# Key alias (the name you gave the key, typically "my-key-alias")
+keyAlias=
+
+# Key password (the password for the specific key, usually same as storePassword)
+keyPassword=
