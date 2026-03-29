@@ -278,11 +278,11 @@ class TranscriptionScreen extends StatelessWidget {
       case TranscriptionState.recording:
         return 'Recording your voice...';
       case TranscriptionState.transcribing:
-        return 'Transcribing...';
+        return 'Transcribing your voice...';
       case TranscriptionState.processing:
         return 'Processing with Gemini...';
       case TranscriptionState.done:
-        return 'Analysis ready';
+        return 'Transcription complete!';
       case TranscriptionState.error:
         return 'Something went wrong';
       default:
