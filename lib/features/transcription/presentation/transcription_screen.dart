@@ -1,6 +1,6 @@
-import 'package:doc_pilot_new_app_gradel_fix/screens/prescription_screen.dart';
 import 'package:doc_pilot_new_app_gradel_fix/screens/summary_screen.dart';
 import 'package:doc_pilot_new_app_gradel_fix/screens/transcription_detail_screen.dart';
+import 'package:doc_pilot_new_app_gradel_fix/screens/medical_insights_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'transcription_controller.dart';
@@ -32,7 +32,11 @@ class TranscriptionScreen extends StatelessWidget {
               children: [
                 const Text(
                   'DocPilot',
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -57,7 +61,12 @@ class TranscriptionScreen extends StatelessWidget {
                           height: value * 80 + 5,
                           decoration: BoxDecoration(
                             color: controller.isRecording
-                                ? HSLColor.fromAHSL(1.0, (280 + index * 2) % 360, 0.8, 0.7 + value * 0.2).toColor()
+                                ? HSLColor.fromAHSL(
+                                    1.0,
+                                    (280 + index * 2) % 360,
+                                    0.8,
+                                    0.7 + value * 0.2,
+                                  ).toColor()
                                 : Colors.white.withOpacity(0.5),
                             borderRadius: BorderRadius.circular(5),
                           ),
@@ -66,38 +75,48 @@ class TranscriptionScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 40),
 
-                // Mic button
+                // Mic Button
                 Center(
                   child: GestureDetector(
                     onTap: controller.isProcessing ? null : controller.toggleRecording,
-                    child: Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: controller.isRecording ? Colors.red : Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: (controller.isRecording ? Colors.red : Colors.white).withOpacity(0.3),
-                            spreadRadius: 8,
-                            blurRadius: 20,
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        controller.isRecording ? Icons.stop : Icons.mic,
-                        size: 50,
-                        color: controller.isRecording ? Colors.white : Colors.deepPurple.shade800,
+                    child: AnimatedScale(
+                      scale: controller.isRecording ? 1.2 : 1.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: controller.isRecording ? Colors.red : Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: (controller.isRecording ? Colors.red : Colors.white)
+                                  .withOpacity(0.3),
+                              spreadRadius: 8,
+                              blurRadius: 20,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          controller.isRecording ? Icons.stop : Icons.mic,
+                          size: 50,
+                          color: controller.isRecording
+                              ? Colors.white
+                              : Colors.deepPurple.shade800,
+                        ),
                       ),
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 20),
 
-                // Status indicator
-                Center(
+                // Status Row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -105,52 +124,97 @@ class TranscriptionScreen extends StatelessWidget {
                         Container(
                           width: 16,
                           height: 16,
-                          margin: const EdgeInsets.only(right: 8.0),
+                          margin: const EdgeInsets.only(right: 8),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: controller.isRecording
                                 ? Colors.red
                                 : controller.state == TranscriptionState.processing
-                                ? Colors.blue
-                                : Colors.amber,
+                                    ? Colors.blue
+                                    : Colors.amber,
                           ),
                         ),
-                      Text(
-                        _statusDetailText(controller),
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white),
+                      Expanded(
+                        child: Text(
+                          _statusDetailText(controller),
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 40),
 
-                // Navigation buttons
+                const SizedBox(height: 20),
+
+                // Empty State (FIXED: No period in sentinel string)
+                if (controller.state == TranscriptionState.done &&
+                    (controller.transcription.isEmpty || 
+                     controller.transcription == "No speech detected"))
+                  const Center(
+                    child: Text(
+                      "No speech detected. Try again.",
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ),
+
+                const SizedBox(height: 20),
+
+                // Navigation Buttons
                 Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  child: ListView(
                     children: [
                       _buildNavigationButton(
-                        context, 'Transcription', Icons.record_voice_over,
-                        controller.transcription.isNotEmpty,
-                        () => Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => TranscriptionDetailScreen(transcription: controller.transcription),
-                        )),
+                        context,
+                        'Summary',
+                        Icons.description,
+                        controller.summary.isNotEmpty && !controller.isProcessing,
+                        () => Navigator.push(
+                          context, 
+                          MaterialPageRoute(builder: (_) => SummaryScreen(summary: controller.summary))
+                        ),
                       ),
-                      const SizedBox(height: 16),
+                      
+                      const SizedBox(height: 12),
+
                       _buildNavigationButton(
-                        context, 'Summary', Icons.summarize,
-                        controller.summary.isNotEmpty,
-                        () => Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => SummaryScreen(summary: controller.summary),
-                        )),
+                        context,
+                        'Full Transcription',
+                        Icons.text_snippet,
+                        controller.transcription.isNotEmpty && 
+                        controller.transcription != "No speech detected" &&
+                        !controller.isProcessing,
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => TranscriptionDetailScreen(
+                              transcription: controller.transcription,
+                            ),
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: 16),
+
+                      const SizedBox(height: 12),
+
                       _buildNavigationButton(
-                        context, 'Prescription', Icons.medication,
-                        controller.prescription.isNotEmpty,
-                        () => Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => PrescriptionScreen(prescription: controller.prescription),
-                        )),
+                        context,
+                        'Medical Insights',
+                        Icons.analytics,
+                        controller.summary.isNotEmpty && !controller.isProcessing,
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => MedicalInsightsScreen(
+                              symptoms: controller.symptoms,
+                              medicines: controller.medicines,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -163,56 +227,74 @@ class TranscriptionScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildNavigationButton(
+    BuildContext context,
+    String label,
+    IconData icon,
+    bool enabled,
+    VoidCallback onTap,
+  ) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          decoration: BoxDecoration(
+            color: enabled ? Colors.white.withOpacity(0.15) : Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: enabled ? Colors.white24 : Colors.white10,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: enabled ? Colors.white : Colors.white38),
+              const SizedBox(width: 16),
+              Text(
+                label,
+                style: TextStyle(
+                  color: enabled ? Colors.white : Colors.white38,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: enabled ? Colors.white70 : Colors.white12,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   String _statusText(TranscriptionState state) {
     switch (state) {
-      case TranscriptionState.recording:    return 'Recording your voice...';
-      case TranscriptionState.transcribing: return 'Transcribing your voice...';
-      case TranscriptionState.processing:   return 'Processing with Gemini...';
-      case TranscriptionState.error:        return 'Something went wrong';
-      default:                              return 'Tap the mic to begin';
+      case TranscriptionState.recording:
+        return 'Recording your voice...';
+      case TranscriptionState.transcribing:
+        return 'Transcribing your voice...';
+      case TranscriptionState.processing:
+        return 'Processing with Gemini...';
+      case TranscriptionState.done:
+        return 'Transcription complete!';
+      case TranscriptionState.error:
+        return 'Something went wrong';
+      default:
+        return 'Tap the mic to begin';
     }
   }
 
   String _statusDetailText(TranscriptionController controller) {
-    switch (controller.state) {
-      case TranscriptionState.recording:    return 'Recording in progress';
-      case TranscriptionState.transcribing: return 'Processing audio...';
-      case TranscriptionState.processing:   return 'Generating content with Gemini...';
-      case TranscriptionState.done:         return 'Ready to view results';
-      case TranscriptionState.error:        return controller.errorMessage ?? 'Error occurred';
-      default:                              return 'Press the microphone button to start';
-    }
-  }
-
-  Widget _buildNavigationButton(
-    BuildContext context,
-    String title,
-    IconData icon,
-    bool isEnabled,
-    VoidCallback onPressed,
-  ) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: isEnabled ? onPressed : null,
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.deepPurple,
-          disabledBackgroundColor: Colors.white.withOpacity(0.3),
-          disabledForegroundColor: Colors.white.withOpacity(0.5),
-          elevation: isEnabled ? 4 : 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 24),
-            const SizedBox(width: 12),
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
-        ),
-      ),
-    );
+    if (controller.isRecording) return 'Recording in progress...';
+    if (controller.state == TranscriptionState.transcribing) return 'Converting speech to text...';
+    if (controller.state == TranscriptionState.processing) return 'Extracting medical insights...';
+    if (controller.state == TranscriptionState.done) return 'Review your insights below';
+    return 'Tap the microphone to begin';
   }
 }
