@@ -9,6 +9,7 @@ import '../data/deepgram_service.dart';
 import '../data/gemini_service.dart';
 import '../domain/transcription_model.dart';
 import '../domain/medical_insights.dart';
+
 enum TranscriptionState { idle, recording, transcribing, processing, done, error }
 
 class TranscriptionController extends ChangeNotifier {
@@ -33,8 +34,8 @@ class TranscriptionController extends ChangeNotifier {
   String get transcription => data.rawTranscript;
   String get summary => data.insights?.summary ?? '';
 
-  List<String> get symptoms => data.insights?.symptoms ?? [];
-  List<String> get medicines => data.insights?.medicines ?? [];
+  List<String> get symptoms => List.unmodifiable(data.insights?.symptoms ?? []);
+  List<String> get medicines => List.unmodifiable(data.insights?.medicines ?? []);
 
   @Deprecated('Use summary, symptoms, or medicines instead')
   String get prescription => summary;
