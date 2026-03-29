@@ -116,7 +116,7 @@ class TranscriptionScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                //  Status Row (FIXED)
+                //  Status Row
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Row(
@@ -154,9 +154,10 @@ class TranscriptionScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // 🧠 Empty State
+                //  Empty State
                 if (controller.state == TranscriptionState.done &&
-                    controller.transcription.isEmpty)
+                    (controller.transcription.isEmpty || 
+                     controller.transcription == "No speech detected."))
                   const Center(
                     child: Text(
                       "No speech detected. Try again.",
@@ -166,59 +167,57 @@ class TranscriptionScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // 🚀 Navigation Buttons
-Expanded(
-  child: ListView(
-    children: [
-      // 1. Summary Button
-      _buildNavigationButton(
-        context,
-        'Summary',
-        Icons.description,
-        controller.summary.isNotEmpty && !controller.isProcessing,
-        () => Navigator.push(
-          context, 
-          MaterialPageRoute(builder: (_) => SummaryScreen(summary: controller.summary))
-        ),
-      ),
-      
-      const SizedBox(height: 12),
+                //  Navigation Buttons
+                Expanded(
+                  child: ListView(
+                    children: [
+                      _buildNavigationButton(
+                        context,
+                        'Summary',
+                        Icons.description,
+                        controller.summary.isNotEmpty && !controller.isProcessing,
+                        () => Navigator.push(
+                          context, 
+                          MaterialPageRoute(builder: (_) => SummaryScreen(summary: controller.summary))
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 12),
 
-      // 2. Prescription Button (Legacy Adapter)
-      _buildNavigationButton(
-        context,
-        'Prescription',
-        Icons.medication,
-        controller.prescription.isNotEmpty && !controller.isProcessing,
-        () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => PrescriptionScreen(prescription: controller.prescription)),
-        ),
-      ),
+                      _buildNavigationButton(
+                        context,
+                        'Full Transcription',
+                        Icons.text_snippet,
+                        controller.transcription.isNotEmpty && 
+                        controller.transcription != "No speech detected." &&
+                        !controller.isProcessing,
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => TranscriptionDetailScreen(
+                              transcription: controller.transcription,
+                            ),
+                          ),
+                        ),
+                      ),
 
-      const SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
-      // 3. Medical Insights Button (FIXED LOGIC)
-      _buildNavigationButton(
-        context,
-        'Medical Insights',
-        Icons.medical_services,
-        // ✅ Enable if EITHER symptoms or medicines are found
-        (controller.symptoms.isNotEmpty || controller.medicines.isNotEmpty) && !controller.isProcessing,
-        () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => MedicalInsightsScreen(
-              symptoms: controller.symptoms,
-              medicines: controller.medicines,
-            ),
-          ),
-        ),
-      ),
-    ],
-  ),
-),
-
+                      _buildNavigationButton(
+                        context,
+                        'Medical Insights',
+                        Icons.analytics,
+                        controller.summary.isNotEmpty && !controller.isProcessing,
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => MedicalInsightsScreen(summary: controller.summary),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -227,6 +226,53 @@ Expanded(
     );
   }
 
+  Widget _buildNavigationButton(
+    BuildContext context,
+    String label,
+    IconData icon,
+    bool enabled,
+    VoidCallback onTap,
+  ) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          decoration: BoxDecoration(
+            color: enabled ? Colors.white.withOpacity(0.15) : Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: enabled ? Colors.white24 : Colors.white10,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: enabled ? Colors.white : Colors.white38),
+              const SizedBox(width: 16),
+              Text(
+                label,
+                style: TextStyle(
+                  color: enabled ? Colors.white : Colors.white38,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: enabled ? Colors.white70 : Colors.white12,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // FIXED: Explicitly handles .done and removed duplicate code
   String _statusText(TranscriptionState state) {
     switch (state) {
       case TranscriptionState.recording:
@@ -235,6 +281,8 @@ Expanded(
         return 'Transcribing your voice...';
       case TranscriptionState.processing:
         return 'Processing with AI...';
+      case TranscriptionState.done:
+        return 'Analysis ready';
       case TranscriptionState.error:
         return 'Something went wrong';
       default:
@@ -243,46 +291,10 @@ Expanded(
   }
 
   String _statusDetailText(TranscriptionController controller) {
-    switch (controller.state) {
-      case TranscriptionState.recording:
-        return 'Recording in progress';
-      case TranscriptionState.transcribing:
-        return 'Processing audio...';
-      case TranscriptionState.processing:
-        return 'Generating insights...';
-      case TranscriptionState.done:
-        return 'Ready to view results';
-      case TranscriptionState.error:
-        return controller.errorMessage ?? 'Error occurred';
-      default:
-        return 'Press the microphone button to start';
-    }
-  }
-
-  Widget _buildNavigationButton(
-    BuildContext context,
-    String title,
-    IconData icon,
-    bool isEnabled,
-    VoidCallback onPressed,
-  ) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        icon: Icon(icon, color: Colors.deepPurple),
-        label: Text(
-          title,
-          style: const TextStyle(fontSize: 16, color: Colors.black87),
-        ),
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          backgroundColor: isEnabled ? Colors.white : Colors.white24,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-        onPressed: isEnabled ? onPressed : null,
-      ),
-    );
+    if (controller.isRecording) return 'Recording in progress...';
+    if (controller.state == TranscriptionState.processing) return 'Converting speech to text...';
+    if (controller.state == TranscriptionState.summarizing) return 'Analyzing medical content...';
+    if (controller.state == TranscriptionState.done) return 'Review your insights below';
+    return 'Tap the microphone to begin';
   }
 }
