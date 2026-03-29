@@ -152,10 +152,10 @@ class TranscriptionScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // Empty State
+                // Empty State (FIXED: Removed period to match controller sentinel)
                 if (controller.state == TranscriptionState.done &&
                     (controller.transcription.isEmpty || 
-                     controller.transcription == "No speech detected."))
+                     controller.transcription == "No speech detected"))
                   const Center(
                     child: Text(
                       "No speech detected. Try again.",
@@ -187,7 +187,7 @@ class TranscriptionScreen extends StatelessWidget {
                         'Full Transcription',
                         Icons.text_snippet,
                         controller.transcription.isNotEmpty && 
-                        controller.transcription != "No speech detected." &&
+                        controller.transcription != "No speech detected" &&
                         !controller.isProcessing,
                         () => Navigator.push(
                           context,
@@ -201,7 +201,6 @@ class TranscriptionScreen extends StatelessWidget {
 
                       const SizedBox(height: 12),
 
-                      // FIXED: Passing correct List<String> parameters to MedicalInsightsScreen
                       _buildNavigationButton(
                         context,
                         'Medical Insights',
@@ -274,6 +273,7 @@ class TranscriptionScreen extends StatelessWidget {
     );
   }
 
+  // FIXED: Explicitly handles .done and removed duplicate switch cases
   String _statusText(TranscriptionState state) {
     switch (state) {
       case TranscriptionState.recording:
@@ -293,7 +293,6 @@ class TranscriptionScreen extends StatelessWidget {
 
   String _statusDetailText(TranscriptionController controller) {
     if (controller.isRecording) return 'Recording in progress...';
-    // FIXED: Adjusted to use existing enum states (transcribing -> processing)
     if (controller.state == TranscriptionState.transcribing) return 'Converting speech to text...';
     if (controller.state == TranscriptionState.processing) return 'Extracting medical insights...';
     if (controller.state == TranscriptionState.done) return 'Review your insights below';
