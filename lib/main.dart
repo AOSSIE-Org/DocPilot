@@ -6,7 +6,12 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
 Future<void> main() async {
-  await dotenv.load();
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // Allow app startup for web/preview environments where .env is unavailable.
+  }
   runApp(const MyApp());
 }
 
