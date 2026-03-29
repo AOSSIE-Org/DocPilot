@@ -1,13 +1,12 @@
-import 'dart:developer' as developer;
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../data/deepgram_service.dart';
-import '../data/local_storage_service.dart';
 import '../data/gemini_service.dart';
+import '../data/local_storage_service.dart';
 import '../domain/transcription_model.dart';
 import '../domain/medical_insights.dart';
 import '../domain/transcription_history_model.dart';
@@ -18,103 +17,86 @@ class TranscriptionController extends ChangeNotifier {
   final _audioRecorder = AudioRecorder();
   final _deepgramService = DeepgramService();
   final _geminiService = GeminiService();
-  
   final _localStorageService = LocalStorageService();
 
   TranscriptionState state = TranscriptionState.idle;
   TranscriptionModel data = const TranscriptionModel();
-
   String? errorMessage;
   String _recordingPath = '';
-  final List<double> waveformValues = List.filled(40, 0.0);
-  Timer? _waveformTimer;
 
   bool get isRecording => state == TranscriptionState.recording;
-  bool get isProcessing =>
-      state == TranscriptionState.transcribing ||
-      state == TranscriptionState.processing;
 
+  // UI Helper Getters
   String get transcription => data.rawTranscript;
   String get summary => data.insights?.summary ?? '';
-  String get prescription => data.prescription ?? ''; // FIXED: Return actual prescription
-  
-  List<String> get symptoms => List.unmodifiable(data.insights?.symptoms ?? []);
-  List<String> get medicines => List.unmodifiable(data.insights?.medicines ?? []);
+  List<String> get symptoms => data.insights?.symptoms ?? [];
+  List<String> get medicines => data.insights?.medicines ?? [];
 
-  bool get hasInsights => symptoms.isNotEmpty || medicines.isNotEmpty || summary.isNotEmpty;
+  Future<void> toggleRecording() async {
+    isRecording ? await _stopRecording() : await _startRecording();
+  }
 
-  Future<bool> requestPermissions() async {
-    final status = await Permission.microphone.request();
-    if (status.isGranted) return true;
-    
-    _setError(status.isPermanentlyDenied 
-        ? 'Microphone permission permanently denied. Please enable it in settings.' 
-        : 'Microphone permission denied');
-    return false;
+  Future<void> _startRecording() async {
+    try {
+      if (!await _audioRecorder.hasPermission()) return;
+      final dir = await getTemporaryDirectory();
+      _recordingPath = '${dir.path}/rec_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      
+      await _audioRecorder.start(const RecordConfig(), path: _recordingPath);
+      state = TranscriptionState.recording;
+      data = const TranscriptionModel(); 
+      notifyListeners();
+    } catch (e) { _setError("Record start failed: $e"); }
+  }
+
+  Future<void> _stopRecording() async {
+    try {
+      final path = await _audioRecorder.stop();
+      if (path == null) return;
+      
+      state = TranscriptionState.transcribing;
+      notifyListeners();
+      
+      final transcript = await _deepgramService.transcribe(path);
+      await _processWithGemini(transcript);
+    } catch (e) { _setError("Transcription failed: $e"); }
   }
 
   Future<void> _processWithGemini(String transcript) async {
-    // 1. Handle Empty Input Early
-    if (transcript.trim().isEmpty || transcript == "No speech detected") {
-      state = TranscriptionState.idle;
-      notifyListeners();
-      return;
-    }
+    state = TranscriptionState.processing;
+    notifyListeners();
 
     try {
-      state = TranscriptionState.processing;
-      notifyListeners();
-
-      // Parallelize AI calls for better performance
-      final results = await Future.wait([
-        _geminiService.generateSummary(transcript),
-        _geminiService.generatePrescription(transcript),
-        _geminiService.generateInsights(transcript),
-      ]);
-
-      final String summaryText = results[0] as String;
-      final String prescriptionText = results[1] as String;
-      final MedicalInsights insights = results[2] as MedicalInsights;
-
+      // GeminiService only has generateInsights; we derive summary from it.
+      final insights = await _geminiService.generateInsights(transcript);
+      
       data = data.copyWith(
+        rawTranscript: transcript,
         insights: insights,
-        summary: summaryText,
-        prescription: prescriptionText,
+        summary: insights.summary,
       );
 
-      // 2. Mark UI Done BEFORE persistence to ensure responsiveness
-      state = TranscriptionState.done;
-      notifyListeners();
-
-      // 3. Isolated Persistence (Doesn't break UI on failure)
-      _persistHistory(transcript, insights);
-
-    } catch (e) {
-      _setError('Gemini error: $e');
-    }
-  }
-
-  Future<void> _persistHistory(String transcript, MedicalInsights insights) async {
-    try {
-      final historyItem = TranscriptionHistoryModel(
+      final history = TranscriptionHistoryModel(
         transcript: transcript,
         summary: insights.summary,
         symptoms: insights.symptoms,
         medicines: insights.medicines,
         createdAt: DateTime.now(),
       );
-      await _localStorageService.save(historyItem);
-      developer.log('History persisted successfully');
+
+      await _localStorageService.save(history);
+      state = TranscriptionState.done;
     } catch (e) {
-      developer.log('Persistence failed: $e', level: 1000);
+      _setError("AI Processing failed: $e");
+    } finally {
+      notifyListeners();
     }
   }
 
-  void _setError(String message) {
-    errorMessage = message;
+  void _setError(String msg) {
+    errorMessage = msg;
     state = TranscriptionState.error;
     notifyListeners();
-    developer.log(message, name: 'TranscriptionController', error: message);
   }
 
   void checkConfigStatus(bool isLoaded) {
