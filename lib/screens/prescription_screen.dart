@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:doc_pilot_new_app_gradel_fix/services/pdf_service.dart';
 
 class PrescriptionScreen extends StatefulWidget {
   final String prescription;
@@ -16,6 +17,49 @@ class PrescriptionScreen extends StatefulWidget {
 
 class _PrescriptionScreenState extends State<PrescriptionScreen> {
   bool _isSaving = false;
+  final PdfService _pdfService = PdfService();
+
+  Future<void> _savePrescriptionAsPdf() async {
+    if (widget.prescription.isEmpty) {
+      _showMessage('No prescription content to save');
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      // Request storage permission
+      final status = await Permission.storage.request();
+      if (!status.isGranted) {
+        _showMessage('Storage permission is required to save the prescription');
+        setState(() {
+          _isSaving = false;
+        });
+        return;
+      }
+
+      // Generate PDF
+      final filePath = await _pdfService.generatePrescriptionPdf(
+        prescriptionText: widget.prescription,
+      );
+
+      // Share the PDF file
+      await Share.shareXFiles(
+        [XFile(filePath)],
+        text: 'Medical Prescription PDF',
+      );
+
+      _showMessage('Prescription saved as PDF and ready to share');
+    } catch (e) {
+      _showMessage('Error saving prescription as PDF: $e');
+    } finally {
+      setState(() {
+        _isSaving = false;
+      });
+    }
+  }
 
   Future<void> _savePrescription() async {
     if (widget.prescription.isEmpty) {
@@ -170,15 +214,38 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _isSaving ? null : _savePrescription,
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-        elevation: 8,
-        tooltip: 'Save Prescription',
-        child: _isSaving
-            ? const CircularProgressIndicator(color: Colors.white)
-            : const Icon(Icons.download),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            onPressed: _isSaving ? null : _savePrescriptionAsPdf,
+            backgroundColor: Colors.deepPurple,
+            foregroundColor: Colors.white,
+            elevation: 8,
+            heroTag: 'savePdf',
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.picture_as_pdf),
+            label: const Text('Save as PDF'),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton.extended(
+            onPressed: _isSaving ? null : _savePrescription,
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.deepPurple,
+            elevation: 6,
+            heroTag: 'saveText',
+            icon: const Icon(Icons.text_snippet),
+            label: const Text('Save as Text'),
+          ),
+        ],
       ),
     );
   }
