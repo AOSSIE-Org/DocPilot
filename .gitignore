@@ -31,8 +31,42 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-.env
 /build/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.staging
+
+# Firebase configuration files (contain API keys)
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+ios/firebase_app_id_file.json
+android/app/src/google-services.json
+
+# Android signing credentials
+android/key.properties
+*.jks
+*.keystore
+release-keystore.jks
+upload-keystore.jks
+
+# iOS signing and provisioning
+ios/Runner/GoogleService-Info.plist
+ios/Runner/Info.plist.backup
+*.mobileprovision
+*.p12
+*.certSigningRequest
+
+# Secret keys and credentials
+**/secrets.json
+**/credentials.json
+**/*-credentials.json
+**/api-keys.json
+**/*-secrets.yaml
 
 # Symbolication related
 app.*.symbols
