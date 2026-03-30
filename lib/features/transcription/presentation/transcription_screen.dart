@@ -58,7 +58,7 @@ class TranscriptionScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: controller.isRecording
                                 ? HSLColor.fromAHSL(1.0, (280 + index * 2) % 360, 0.8, 0.7 + value * 0.2).toColor()
-                                : Colors.white.withOpacity(0.5),
+                                : Colors.white.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(5),
                           ),
                         );
@@ -80,7 +80,7 @@ class TranscriptionScreen extends StatelessWidget {
                         color: controller.isRecording ? Colors.red : Colors.white,
                         boxShadow: [
                           BoxShadow(
-                            color: (controller.isRecording ? Colors.red : Colors.white).withOpacity(0.3),
+                            color: (controller.isRecording ? Colors.red : Colors.white).withValues(alpha: 0.3),
                             spreadRadius: 8,
                             blurRadius: 20,
                           ),
@@ -199,8 +199,8 @@ class TranscriptionScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 16),
           backgroundColor: Colors.white,
           foregroundColor: Colors.deepPurple,
-          disabledBackgroundColor: Colors.white.withOpacity(0.3),
-          disabledForegroundColor: Colors.white.withOpacity(0.5),
+          disabledBackgroundColor: Colors.white.withValues(alpha: 0.3),
+          disabledForegroundColor: Colors.white.withValues(alpha: 0.5),
           elevation: isEnabled ? 4 : 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
