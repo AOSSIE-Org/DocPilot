@@ -14,6 +14,9 @@ on:
       - develop
     # Only re-run when dependency manifests actually change
     paths:
+      # Dart / Flutter
+      - "**/pubspec.yaml"
+      - "**/pubspec.lock"
       # JavaScript / TypeScript / Node
       - "**/package.json"
       - "**/package-lock.json"
