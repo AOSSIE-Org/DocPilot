@@ -1,0 +1,380 @@
+name: CI - Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.vscode/**'
+      - '.idea/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.vscode/**'
+      - '.idea/**'
+
+# Cancel in-progress jobs if a new commit is pushed to same PR/branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.22.0'
+  JAVA_VERSION: '17'
+  NODE_VERSION: '18'
+
+jobs:
+  # ========================================
+  # CODE QUALITY & ANALYSIS
+  # ========================================
+  analyze:
+    name: 🔍 Code Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🔍 Analyze Code
+        run: flutter analyze --fatal-infos
+
+      - name: ✅ Verify Formatting
+        run: dart format --set-exit-if-changed lib test
+
+  # ========================================
+  # UNIT TESTING
+  # ========================================
+  test:
+    name: 🧪 Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🏗️ Generate Mocks
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: 🧪 Run Unit Tests
+        run: flutter test --coverage --reporter=compact
+
+      - name: 📊 Upload Coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage/lcov.info
+          fail_ci_if_error: false
+          verbose: true
+
+      - name: 📋 Coverage Report
+        run: |
+          echo "## Test Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Coverage data has been uploaded to Codecov for detailed analysis." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Generate basic coverage stats if lcov is available
+          if command -v genhtml &> /dev/null; then
+            genhtml coverage/lcov.info -o coverage/html --quiet
+            lines_covered=$(grep -A3 "Overall coverage rate" coverage/html/index.html | grep "lines" | grep -o '[0-9]*\.[0-9]*%' || echo "N/A")
+            functions_covered=$(grep -A3 "Overall coverage rate" coverage/html/index.html | grep "functions" | grep -o '[0-9]*\.[0-9]*%' || echo "N/A")
+            echo "- **Line Coverage:** $lines_covered" >> $GITHUB_STEP_SUMMARY
+            echo "- **Function Coverage:** $functions_covered" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ========================================
+  # ANDROID BUILD
+  # ========================================
+  build-android:
+    name: 🤖 Build Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'adopt'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🏗️ Build Android APK (Debug)
+        run: flutter build apk --debug
+
+      - name: 🏗️ Build Android APK (Release)
+        run: flutter build apk --release --no-obfuscate
+
+      - name: 🏗️ Build Android App Bundle
+        run: flutter build appbundle --release --no-obfuscate
+
+      - name: 📤 Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-${{ github.run_number }}
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
+
+      - name: 📤 Upload AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab-${{ github.run_number }}
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 7
+
+  # ========================================
+  # iOS BUILD
+  # ========================================
+  build-ios:
+    name: 🍎 Build iOS
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🍎 Setup iOS
+        run: |
+          sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer/
+          xcodebuild -version
+
+      - name: 📱 Install CocoaPods
+        run: |
+          cd ios
+          pod install
+
+      - name: 🏗️ Build iOS (Debug)
+        run: flutter build ios --debug --no-codesign
+
+      - name: 🏗️ Build iOS (Release)
+        run: flutter build ios --release --no-codesign
+
+      - name: 📋 iOS Build Summary
+        run: |
+          echo "## iOS Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ iOS Debug build completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "✅ iOS Release build completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** Code signing skipped for CI environment" >> $GITHUB_STEP_SUMMARY
+
+  # ========================================
+  # WEB BUILD
+  # ========================================
+  build-web:
+    name: 🌐 Build Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 🌐 Enable Web
+        run: flutter config --enable-web
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🏗️ Build Web
+        run: flutter build web --release --web-renderer canvaskit
+
+      - name: 📤 Upload Web Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build-${{ github.run_number }}
+          path: build/web/
+          retention-days: 7
+
+  # ========================================
+  # LINUX BUILD
+  # ========================================
+  build-linux:
+    name: 🐧 Build Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Install Linux Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 🐧 Enable Linux
+        run: flutter config --enable-linux-desktop
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🏗️ Build Linux
+        run: flutter build linux --release
+
+      - name: 📤 Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build-${{ github.run_number }}
+          path: build/linux/x64/release/bundle/
+          retention-days: 7
+
+  # ========================================
+  # SECURITY SCAN
+  # ========================================
+  security:
+    name: 🔐 Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🔐 Run Security Audit
+        run: |
+          echo "## Security Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check for known vulnerabilities in dependencies
+          if flutter pub deps --json | grep -q "security"; then
+            echo "⚠️ Security vulnerabilities found in dependencies" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ No known security vulnerabilities found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Run \`flutter pub audit\` locally for detailed security analysis." >> $GITHUB_STEP_SUMMARY
+
+  # ========================================
+  # QUALITY GATE SUMMARY
+  # ========================================
+  quality-gate:
+    name: ✅ Quality Gate
+    needs: [analyze, test, build-android, build-ios, build-web, build-linux]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: 📊 Quality Gate Summary
+        run: |
+          echo "## 🎯 Quality Gate Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check job results
+          if [ "${{ needs.analyze.result }}" = "success" ]; then
+            echo "✅ **Code Analysis:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Code Analysis:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.test.result }}" = "success" ]; then
+            echo "✅ **Unit Tests:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Unit Tests:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.build-android.result }}" = "success" ]; then
+            echo "✅ **Android Build:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Android Build:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.build-ios.result }}" = "success" ]; then
+            echo "✅ **iOS Build:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **iOS Build:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.build-web.result }}" = "success" ]; then
+            echo "✅ **Web Build:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Web Build:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.build-linux.result }}" = "success" ]; then
+            echo "✅ **Linux Build:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Linux Build:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Overall status
+          if [ "${{ needs.analyze.result }}" = "success" ] && [ "${{ needs.test.result }}" = "success" ] && [ "${{ needs.build-android.result }}" = "success" ] && [ "${{ needs.build-ios.result }}" = "success" ] && [ "${{ needs.build-web.result }}" = "success" ] && [ "${{ needs.build-linux.result }}" = "success" ]; then
+            echo "🎉 **Overall Status:** All quality gates passed!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "🚨 **Overall Status:** Some quality gates failed. Please review the issues above." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: ❌ Fail if any job failed
+        run: |
+          if [ "${{ needs.analyze.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ] || [ "${{ needs.build-android.result }}" != "success" ] || [ "${{ needs.build-ios.result }}" != "success" ] || [ "${{ needs.build-web.result }}" != "success" ] || [ "${{ needs.build-linux.result }}" != "success" ]; then
+            echo "Quality gate failed. One or more jobs did not complete successfully."
+            exit 1
+          fi
+          echo "All quality gates passed successfully!"

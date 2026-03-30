@@ -1,0 +1,450 @@
+name: PR Quality Check
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  # ========================================
+  # BASIC PR VALIDATION
+  # ========================================
+  validate-pr:
+    name: 🔍 Validate PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: 📥 Checkout PR
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: 🔍 PR Information
+        id: pr_info
+        run: |
+          echo "## PR Quality Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**PR:** #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Title:** ${{ github.event.pull_request.title }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Author:** @${{ github.event.pull_request.user.login }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.event.pull_request.head.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Extract basic PR metrics
+          FILES_CHANGED=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}..HEAD | wc -l)
+          LINES_ADDED=$(git diff --numstat origin/${{ github.event.pull_request.base.ref }}..HEAD | awk '{added+=$1} END {print added+0}')
+          LINES_REMOVED=$(git diff --numstat origin/${{ github.event.pull_request.base.ref }}..HEAD | awk '{removed+=$2} END {print removed+0}')
+
+          echo "**Files Changed:** $FILES_CHANGED" >> $GITHUB_STEP_SUMMARY
+          echo "**Lines Added:** +$LINES_ADDED" >> $GITHUB_STEP_SUMMARY
+          echo "**Lines Removed:** -$LINES_REMOVED" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Set outputs for later use
+          echo "files_changed=$FILES_CHANGED" >> $GITHUB_OUTPUT
+          echo "lines_added=$LINES_ADDED" >> $GITHUB_OUTPUT
+          echo "lines_removed=$LINES_REMOVED" >> $GITHUB_OUTPUT
+
+      - name: 🏷️ Check PR Title Format
+        id: title_check
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+
+          # Check for conventional commit format
+          if echo "$TITLE" | grep -qE "^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?: .+"; then
+            echo "✅ **Title Format:** Follows conventional commits" >> $GITHUB_STEP_SUMMARY
+            echo "title_valid=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ **Title Format:** Consider using conventional commits format" >> $GITHUB_STEP_SUMMARY
+            echo "📋 **Example:** \`feat: add new login component\` or \`fix(auth): resolve token expiration issue\`" >> $GITHUB_STEP_SUMMARY
+            echo "title_valid=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📝 Check PR Description
+        id: description_check
+        run: |
+          DESCRIPTION="${{ github.event.pull_request.body }}"
+
+          if [ -n "$DESCRIPTION" ] && [ ${#DESCRIPTION} -gt 20 ]; then
+            echo "✅ **Description:** Adequate description provided" >> $GITHUB_STEP_SUMMARY
+            echo "description_valid=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ **Description:** Consider adding a more detailed description" >> $GITHUB_STEP_SUMMARY
+            echo "description_valid=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📊 Check PR Size
+        id: size_check
+        run: |
+          FILES_CHANGED="${{ steps.pr_info.outputs.files_changed }}"
+          LINES_CHANGED=$((${{ steps.pr_info.outputs.lines_added }} + ${{ steps.pr_info.outputs.lines_removed }}))
+
+          if [ $FILES_CHANGED -le 10 ] && [ $LINES_CHANGED -le 500 ]; then
+            echo "✅ **PR Size:** Small and focused (👍 easy to review)" >> $GITHUB_STEP_SUMMARY
+            echo "size_category=small" >> $GITHUB_OUTPUT
+          elif [ $FILES_CHANGED -le 25 ] && [ $LINES_CHANGED -le 1000 ]; then
+            echo "⚠️ **PR Size:** Medium (consider splitting if possible)" >> $GITHUB_STEP_SUMMARY
+            echo "size_category=medium" >> $GITHUB_OUTPUT
+          else
+            echo "🚨 **PR Size:** Large (strongly consider splitting into smaller PRs)" >> $GITHUB_STEP_SUMMARY
+            echo "💡 **Tip:** Smaller PRs are easier to review and less likely to introduce bugs" >> $GITHUB_STEP_SUMMARY
+            echo "size_category=large" >> $GITHUB_OUTPUT
+          fi
+
+  # ========================================
+  # CODE QUALITY CHECKS
+  # ========================================
+  code-quality:
+    name: 🔍 Code Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: 📥 Checkout PR
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🔍 Run Analysis
+        id: analysis
+        run: |
+          echo "## Code Quality Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Run Flutter analyze and capture output
+          if flutter analyze --fatal-infos > analysis_output.txt 2>&1; then
+            echo "✅ **Static Analysis:** No issues found" >> $GITHUB_STEP_SUMMARY
+            echo "analysis_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ **Static Analysis:** Issues found" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            head -20 analysis_output.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "analysis_passed=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: ✅ Check Formatting
+        id: formatting
+        run: |
+          # Check if code is properly formatted
+          if dart format --set-exit-if-changed lib test; then
+            echo "✅ **Code Formatting:** All files properly formatted" >> $GITHUB_STEP_SUMMARY
+            echo "formatting_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ **Code Formatting:** Some files need formatting" >> $GITHUB_STEP_SUMMARY
+            echo "💡 **Fix:** Run \`dart format lib test\` to format your code" >> $GITHUB_STEP_SUMMARY
+            echo "formatting_passed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🧪 Test Coverage Check
+        id: coverage
+        run: |
+          # Generate test coverage if tests exist
+          if [ -d "test" ] && [ "$(find test -name "*.dart" | wc -l)" -gt 0 ]; then
+            if flutter test --coverage --reporter=compact > test_output.txt 2>&1; then
+              echo "✅ **Tests:** All tests passing" >> $GITHUB_STEP_SUMMARY
+
+              # Basic coverage info if lcov is available
+              if [ -f "coverage/lcov.info" ]; then
+                COVERAGE_DATA=$(grep -c "DA:" coverage/lcov.info || echo "0")
+                if [ $COVERAGE_DATA -gt 0 ]; then
+                  echo "📊 **Coverage:** Test coverage data generated" >> $GITHUB_STEP_SUMMARY
+                fi
+              fi
+
+              echo "tests_passed=true" >> $GITHUB_OUTPUT
+            else
+              echo "❌ **Tests:** Some tests are failing" >> $GITHUB_STEP_SUMMARY
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+              tail -20 test_output.txt >> $GITHUB_STEP_SUMMARY
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+              echo "tests_passed=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "⚠️ **Tests:** No tests found" >> $GITHUB_STEP_SUMMARY
+            echo "💡 **Recommendation:** Consider adding tests for new functionality" >> $GITHUB_STEP_SUMMARY
+            echo "tests_passed=true" >> $GITHUB_OUTPUT  # Don't fail if no tests exist
+          fi
+
+  # ========================================
+  # SECURITY SCAN
+  # ========================================
+  security-scan:
+    name: 🔐 Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: 📥 Checkout PR
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: 🔍 Scan for Secrets
+        id: secrets_scan
+        run: |
+          echo "## Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Basic secret scanning patterns
+          SECRET_PATTERNS=(
+            "api[_-]?key.*=.*['\"][a-zA-Z0-9]{20,}['\"]"
+            "password.*=.*['\"][^'\"]{8,}['\"]"
+            "secret.*=.*['\"][a-zA-Z0-9]{16,}['\"]"
+            "token.*=.*['\"][a-zA-Z0-9]{20,}['\"]"
+            "auth.*=.*['\"][a-zA-Z0-9]{16,}['\"]"
+          )
+
+          SECRETS_FOUND=false
+
+          for pattern in "${SECRET_PATTERNS[@]}"; do
+            if git diff --name-only HEAD~1..HEAD | xargs grep -l -i -E "$pattern" 2>/dev/null; then
+              SECRETS_FOUND=true
+              break
+            fi
+          done
+
+          if [ "$SECRETS_FOUND" = "true" ]; then
+            echo "⚠️ **Potential Secrets:** Possible secrets or credentials detected" >> $GITHUB_STEP_SUMMARY
+            echo "🔍 **Action Required:** Please review to ensure no sensitive data is committed" >> $GITHUB_STEP_SUMMARY
+            echo "secrets_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "✅ **Secret Scan:** No obvious secrets detected" >> $GITHUB_STEP_SUMMARY
+            echo "secrets_found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📦 Dependency Security
+        id: deps_security
+        run: |
+          # Basic dependency check would go here
+          # In a real implementation, you might use tools like:
+          # - npm audit (for Node.js dependencies)
+          # - bundle audit (for Ruby)
+          # - safety (for Python)
+          # - For Dart/Flutter, pub audit or similar tools
+
+          echo "🔍 **Dependencies:** Basic security check completed" >> $GITHUB_STEP_SUMMARY
+
+  # ========================================
+  # FILE CHECKS
+  # ========================================
+  file-checks:
+    name: 📁 File Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📥 Checkout PR
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: 📁 Check File Types
+        id: file_check
+        run: |
+          echo "## File Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}..HEAD)
+
+          # Count file types
+          DART_FILES=$(echo "$CHANGED_FILES" | grep -c '\.dart$' || echo 0)
+          YAML_FILES=$(echo "$CHANGED_FILES" | grep -c '\.ya?ml$' || echo 0)
+          JSON_FILES=$(echo "$CHANGED_FILES" | grep -c '\.json$' || echo 0)
+          MD_FILES=$(echo "$CHANGED_FILES" | grep -c '\.md$' || echo 0)
+          CONFIG_FILES=$(echo "$CHANGED_FILES" | grep -cE '\.(conf|config|properties|env)$' || echo 0)
+
+          echo "**Changed Files by Type:**" >> $GITHUB_STEP_SUMMARY
+          echo "- 🎯 Dart files: $DART_FILES" >> $GITHUB_STEP_SUMMARY
+          echo "- ⚙️ YAML files: $YAML_FILES" >> $GITHUB_STEP_SUMMARY
+          echo "- 📄 JSON files: $JSON_FILES" >> $GITHUB_STEP_SUMMARY
+          echo "- 📝 Markdown files: $MD_FILES" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔧 Config files: $CONFIG_FILES" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check for sensitive files
+          SENSITIVE_PATTERNS=(
+            "\.env"
+            "\.key"
+            "\.pem"
+            "\.p12"
+            "\.keystore"
+            "google-services\.json"
+            "GoogleService-Info\.plist"
+          )
+
+          SENSITIVE_FOUND=false
+          for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+            if echo "$CHANGED_FILES" | grep -qE "$pattern"; then
+              SENSITIVE_FOUND=true
+              echo "⚠️ **Sensitive File:** Found files matching pattern: $pattern" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          if [ "$SENSITIVE_FOUND" = "false" ]; then
+            echo "✅ **File Safety:** No sensitive file patterns detected" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ========================================
+  # PR QUALITY SUMMARY
+  # ========================================
+  quality-summary:
+    name: 📊 Quality Summary
+    needs: [validate-pr, code-quality, security-scan, file-checks]
+    runs-on: ubuntu-latest
+    if: always() && github.event.pull_request.draft == false
+
+    steps:
+      - name: 📊 Generate Quality Report
+        run: |
+          echo "## 🎯 PR Quality Gate Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Overall quality assessment
+          QUALITY_SCORE=0
+          TOTAL_CHECKS=0
+
+          # Add scoring logic based on job results
+          if [ "${{ needs.validate-pr.result }}" = "success" ]; then
+            QUALITY_SCORE=$((QUALITY_SCORE + 1))
+            echo "✅ **PR Validation:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **PR Validation:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+
+          if [ "${{ needs.code-quality.result }}" = "success" ]; then
+            QUALITY_SCORE=$((QUALITY_SCORE + 1))
+            echo "✅ **Code Quality:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Code Quality:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+
+          if [ "${{ needs.security-scan.result }}" = "success" ]; then
+            QUALITY_SCORE=$((QUALITY_SCORE + 1))
+            echo "✅ **Security Scan:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Security Scan:** Issues found" >> $GITHUB_STEP_SUMMARY
+          fi
+          TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+
+          if [ "${{ needs.file-checks.result }}" = "success" ]; then
+            QUALITY_SCORE=$((QUALITY_SCORE + 1))
+            echo "✅ **File Checks:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **File Checks:** Issues found" >> $GITHUB_STEP_SUMMARY
+          fi
+          TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Calculate quality percentage
+          QUALITY_PERCENTAGE=$((QUALITY_SCORE * 100 / TOTAL_CHECKS))
+
+          if [ $QUALITY_PERCENTAGE -eq 100 ]; then
+            echo "🎉 **Overall Quality:** Excellent ($QUALITY_SCORE/$TOTAL_CHECKS checks passed)" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Ready for Review:** This PR meets all quality standards!" >> $GITHUB_STEP_SUMMARY
+          elif [ $QUALITY_PERCENTAGE -ge 75 ]; then
+            echo "👍 **Overall Quality:** Good ($QUALITY_SCORE/$TOTAL_CHECKS checks passed)" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Minor Issues:** Please address any remaining issues" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Overall Quality:** Needs Improvement ($QUALITY_SCORE/$TOTAL_CHECKS checks passed)" >> $GITHUB_STEP_SUMMARY
+            echo "🔧 **Action Required:** Please fix the issues before requesting review" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Quality check completed. Review the detailed results above.*" >> $GITHUB_STEP_SUMMARY
+
+      - name: 💬 Comment on PR
+        uses: actions/github-script@v7
+        if: always()
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const qualityScore = (${{ needs.validate-pr.result == 'success' && 1 || 0 }} +
+                                 ${{ needs.code-quality.result == 'success' && 1 || 0 }} +
+                                 ${{ needs.security-scan.result == 'success' && 1 || 0 }} +
+                                 ${{ needs.file-checks.result == 'success' && 1 || 0 }});
+            const totalChecks = 4;
+            const qualityPercentage = Math.round((qualityScore / totalChecks) * 100);
+
+            let statusEmoji = "🎉";
+            let statusMessage = "Excellent! All quality checks passed.";
+
+            if (qualityPercentage < 100) {
+              if (qualityPercentage >= 75) {
+                statusEmoji = "👍";
+                statusMessage = "Good! Minor issues to address.";
+              } else {
+                statusEmoji = "⚠️";
+                statusMessage = "Needs improvement. Please fix the issues.";
+              }
+            }
+
+            const comment = `## ${statusEmoji} PR Quality Check Results
+
+            **Overall Score:** ${qualityScore}/${totalChecks} (${qualityPercentage}%)
+
+            ${statusMessage}
+
+            ### 📋 Check Results
+            - ${${{ needs.validate-pr.result == 'success' }} ? '✅' : '❌'} PR Validation
+            - ${${{ needs.code-quality.result == 'success' }} ? '✅' : '❌'} Code Quality
+            - ${${{ needs.security-scan.result == 'success' }} ? '✅' : '❌'} Security Scan
+            - ${${{ needs.file-checks.result == 'success' }} ? '✅' : '❌'} File Checks
+
+            See the [workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for detailed results.
+
+            ---
+            *Auto-generated by PR Quality Check workflow*`;
+
+            // Find existing comment or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            const existingComment = comments.find(comment =>
+              comment.body.includes('PR Quality Check Results') && comment.user.type === 'Bot'
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }

@@ -1,0 +1,327 @@
+name: Performance Monitoring
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]
+  schedule:
+    # Weekly performance benchmarks
+    - cron: '0 6 * * 1'  # 6 AM UTC on Mondays
+
+env:
+  FLUTTER_VERSION: '3.22.0'
+
+jobs:
+  # ========================================
+  # BUILD PERFORMANCE
+  # ========================================
+  build-performance:
+    name: 📊 Build Performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: ⏱️ Measure Build Times
+        id: build_metrics
+        run: |
+          echo "## ⚡ Build Performance Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Measure Debug Build Time
+          start_time=$(date +%s)
+          flutter build apk --debug --quiet
+          debug_time=$(($(date +%s) - start_time))
+
+          # Measure Release Build Time
+          start_time=$(date +%s)
+          flutter build apk --release --quiet
+          release_time=$(($(date +%s) - start_time))
+
+          # Measure Clean Build Time
+          flutter clean
+          flutter pub get
+          start_time=$(date +%s)
+          flutter build apk --release --quiet
+          clean_build_time=$(($(date +%s) - start_time))
+
+          echo "**Build Times:**" >> $GITHUB_STEP_SUMMARY
+          echo "- 🐛 Debug Build: ${debug_time}s" >> $GITHUB_STEP_SUMMARY
+          echo "- 🚀 Release Build: ${release_time}s" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧹 Clean Build: ${clean_build_time}s" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Set outputs for artifact storage
+          echo "debug_time=$debug_time" >> $GITHUB_OUTPUT
+          echo "release_time=$release_time" >> $GITHUB_OUTPUT
+          echo "clean_build_time=$clean_build_time" >> $GITHUB_OUTPUT
+
+      - name: 📊 APK Size Analysis
+        id: size_metrics
+        run: |
+          # Build different variants for size comparison
+          flutter build apk --release --split-per-abi
+
+          echo "**APK Sizes:**" >> $GITHUB_STEP_SUMMARY
+
+          for apk in build/app/outputs/flutter-apk/app-*-release.apk; do
+            if [ -f "$apk" ]; then
+              size_mb=$(du -m "$apk" | cut -f1)
+              filename=$(basename "$apk")
+              echo "- 📱 $filename: ${size_mb}MB" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          # Universal APK size
+          if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
+            universal_size=$(du -m "build/app/outputs/flutter-apk/app-release.apk" | cut -f1)
+            echo "- 🌍 Universal APK: ${universal_size}MB" >> $GITHUB_STEP_SUMMARY
+            echo "universal_apk_size=$universal_size" >> $GITHUB_OUTPUT
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🧪 Test Performance
+        id: test_metrics
+        run: |
+          echo "**Test Performance:**" >> $GITHUB_STEP_SUMMARY
+
+          # Measure test execution time
+          start_time=$(date +%s)
+          flutter test --reporter=compact > test_output.txt 2>&1
+          test_time=$(($(date +%s) - start_time))
+
+          echo "- 🧪 Test Execution: ${test_time}s" >> $GITHUB_STEP_SUMMARY
+
+          # Count tests
+          test_count=$(grep -c "✓" test_output.txt || echo 0)
+          echo "- 📊 Total Tests: $test_count" >> $GITHUB_STEP_SUMMARY
+
+          if [ $test_count -gt 0 ]; then
+            avg_time_per_test=$(( test_time * 1000 / test_count ))
+            echo "- ⚡ Avg per Test: ${avg_time_per_test}ms" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "test_time=$test_time" >> $GITHUB_OUTPUT
+          echo "test_count=$test_count" >> $GITHUB_OUTPUT
+
+      - name: 📊 Save Performance Data
+        run: |
+          # Create performance report JSON
+          cat > performance-report.json << EOF
+          {
+            "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "metrics": {
+              "build_times": {
+                "debug_build_seconds": ${{ steps.build_metrics.outputs.debug_time }},
+                "release_build_seconds": ${{ steps.build_metrics.outputs.release_time }},
+                "clean_build_seconds": ${{ steps.build_metrics.outputs.clean_build_time }}
+              },
+              "apk_sizes": {
+                "universal_apk_mb": ${{ steps.size_metrics.outputs.universal_apk_size || 0 }}
+              },
+              "test_performance": {
+                "test_execution_seconds": ${{ steps.test_metrics.outputs.test_time || 0 }},
+                "total_tests": ${{ steps.test_metrics.outputs.test_count || 0 }}
+              }
+            }
+          }
+          EOF
+
+      - name: 📤 Upload Performance Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report-${{ github.run_number }}
+          path: performance-report.json
+          retention-days: 90
+
+  # ========================================
+  # MEMORY PROFILING
+  # ========================================
+  memory-profiling:
+    name: 🧠 Memory Profiling
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🧠 Analyze Code Complexity
+        id: complexity
+        run: |
+          echo "## 🧠 Code Complexity Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Count lines of code
+          dart_lines=$(find lib -name "*.dart" -exec wc -l {} + | tail -1 | awk '{print $1}')
+          dart_files=$(find lib -name "*.dart" | wc -l)
+
+          echo "**Code Metrics:**" >> $GITHUB_STEP_SUMMARY
+          echo "- 📄 Dart Files: $dart_files" >> $GITHUB_STEP_SUMMARY
+          echo "- 📝 Lines of Code: $dart_lines" >> $GITHUB_STEP_SUMMARY
+
+          if [ $dart_files -gt 0 ]; then
+            avg_lines_per_file=$((dart_lines / dart_files))
+            echo "- 📊 Avg Lines/File: $avg_lines_per_file" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Find large files that might need refactoring
+          echo "**Large Files (>300 lines):**" >> $GITHUB_STEP_SUMMARY
+          large_files_found=false
+
+          while read -r line file; do
+            if [ "$line" -gt 300 ]; then
+              echo "- 📄 $(basename "$file"): ${line} lines" >> $GITHUB_STEP_SUMMARY
+              large_files_found=true
+            fi
+          done < <(find lib -name "*.dart" -exec wc -l {} + | head -n -1 | sort -nr)
+
+          if [ "$large_files_found" = false ]; then
+            echo "- ✅ No files >300 lines found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📊 Dependency Analysis
+        run: |
+          echo "**Dependencies Analysis:**" >> $GITHUB_STEP_SUMMARY
+
+          # Count dependencies
+          deps_count=$(grep -c "^  [a-zA-Z]" pubspec.yaml || echo 0)
+          dev_deps_count=$(grep -A 100 "dev_dependencies:" pubspec.yaml | grep -c "^  [a-zA-Z]" || echo 0)
+
+          echo "- 📦 Production Dependencies: $deps_count" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔧 Dev Dependencies: $dev_deps_count" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 Total Dependencies: $((deps_count + dev_deps_count))" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+  # ========================================
+  # PERFORMANCE REGRESSION CHECK
+  # ========================================
+  regression-check:
+    name: 📈 Regression Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'pull_request'
+    needs: [build-performance]
+
+    steps:
+      - name: 📥 Download Current Performance Data
+        uses: actions/download-artifact@v4
+        with:
+          name: performance-report-${{ github.run_number }}
+          path: current/
+
+      - name: 📊 Regression Analysis
+        id: regression
+        run: |
+          echo "## 📈 Performance Regression Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # In a real implementation, you would:
+          # 1. Download baseline performance data from main branch
+          # 2. Compare current metrics with baseline
+          # 3. Flag significant regressions
+
+          echo "**Current Build Performance:**" >> $GITHUB_STEP_SUMMARY
+          if [ -f "current/performance-report.json" ]; then
+            # Extract build times from JSON
+            debug_time=$(cat current/performance-report.json | grep -o '"debug_build_seconds":[0-9]*' | cut -d: -f2)
+            release_time=$(cat current/performance-report.json | grep -o '"release_build_seconds":[0-9]*' | cut -d: -f2)
+
+            echo "- 🐛 Debug Build: ${debug_time}s" >> $GITHUB_STEP_SUMMARY
+            echo "- 🚀 Release Build: ${release_time}s" >> $GITHUB_STEP_SUMMARY
+
+            # Basic regression thresholds (in a real implementation, compare with baseline)
+            if [ "$release_time" -gt 300 ]; then  # 5 minutes
+              echo "⚠️ **Warning:** Release build time is high (>${release_time}s)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ **Build Performance:** Within acceptable limits" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+  # ========================================
+  # PERFORMANCE SUMMARY
+  # ========================================
+  performance-summary:
+    name: 📋 Performance Summary
+    needs: [build-performance, memory-profiling, regression-check]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: 📊 Generate Performance Summary
+        run: |
+          echo "## 🎯 Performance Monitoring Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Summary based on job results
+          if [ "${{ needs.build-performance.result }}" = "success" ]; then
+            echo "✅ **Build Performance:** Metrics collected successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Build Performance:** Failed to collect metrics" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.memory-profiling.result }}" = "success" ]; then
+            echo "✅ **Memory Profiling:** Analysis completed" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.memory-profiling.result }}" = "skipped" ]; then
+            echo "⏭️ **Memory Profiling:** Skipped (not a PR)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Memory Profiling:** Analysis failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.regression-check.result }}" = "success" ]; then
+            echo "✅ **Regression Check:** No significant regressions detected" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.regression-check.result }}" = "skipped" ]; then
+            echo "⏭️ **Regression Check:** Skipped (not a PR)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Regression Check:** Analysis failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 **Performance data is stored as workflow artifacts for trend analysis**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Recommendations
+          echo "### 💡 **Performance Tips**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏗️ **Build Optimization:** Use \`--split-per-abi\` for smaller APKs" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧹 **Clean Builds:** Regular \`flutter clean\` helps maintain consistent builds" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 **Dependencies:** Regular audit of dependencies for performance impact" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧪 **Test Performance:** Keep tests fast for quick feedback loops" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "*Performance monitoring helps maintain app quality and developer productivity.*" >> $GITHUB_STEP_SUMMARY

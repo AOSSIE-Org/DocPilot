@@ -1,0 +1,465 @@
+name: CD - Continuous Deployment
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+    branches:
+      - main
+      - release/*
+  release:
+    types: [published]
+
+env:
+  FLUTTER_VERSION: '3.22.0'
+  JAVA_VERSION: '17'
+
+jobs:
+  # ========================================
+  # VALIDATE RELEASE
+  # ========================================
+  validate:
+    name: 🔍 Validate Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 📋 Extract Version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          elif [[ $GITHUB_REF == refs/heads/main ]]; then
+            VERSION="main-$(date +'%Y%m%d-%H%M%S')"
+          else
+            VERSION="branch-$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//-/g')-$(date +'%Y%m%d-%H%M%S')"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Check if this is a prerelease
+          if [[ $VERSION == *"alpha"* ]] || [[ $VERSION == *"beta"* ]] || [[ $VERSION == *"rc"* ]] || [[ $VERSION == *"main"* ]] || [[ $VERSION == *"branch"* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "Detected version: $VERSION (prerelease: ${{ steps.version.outputs.is_prerelease }})"
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🧪 Quick Test
+        run: flutter test --reporter=compact
+
+      - name: 🔍 Quick Analysis
+        run: flutter analyze --fatal-warnings
+
+  # ========================================
+  # BUILD RELEASE ARTIFACTS
+  # ========================================
+  build-android-release:
+    name: 🤖 Build Android Release
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'adopt'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🏗️ Build Android APK
+        run: |
+          flutter build apk \
+            --release \
+            --build-name=${{ needs.validate.outputs.version }} \
+            --build-number=${{ github.run_number }}
+
+      - name: 🏗️ Build Android App Bundle
+        run: |
+          flutter build appbundle \
+            --release \
+            --build-name=${{ needs.validate.outputs.version }} \
+            --build-number=${{ github.run_number }}
+
+      - name: 📝 Generate APK Info
+        run: |
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          AAB_PATH="build/app/outputs/bundle/release/app-release.aab"
+
+          echo "## Android Release Build" > android-release-info.md
+          echo "" >> android-release-info.md
+          echo "**Version:** ${{ needs.validate.outputs.version }}" >> android-release-info.md
+          echo "**Build Number:** ${{ github.run_number }}" >> android-release-info.md
+          echo "**Built:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> android-release-info.md
+          echo "**Commit:** ${{ github.sha }}" >> android-release-info.md
+          echo "" >> android-release-info.md
+
+          if [ -f "$APK_PATH" ]; then
+            APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
+            echo "**APK Size:** $APK_SIZE" >> android-release-info.md
+          fi
+
+          if [ -f "$AAB_PATH" ]; then
+            AAB_SIZE=$(du -h "$AAB_PATH" | cut -f1)
+            echo "**AAB Size:** $AAB_SIZE" >> android-release-info.md
+          fi
+
+      - name: 📤 Upload Android Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-${{ needs.validate.outputs.version }}
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+            android-release-info.md
+          retention-days: 30
+
+  build-ios-release:
+    name: 🍎 Build iOS Release
+    needs: validate
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🍎 Setup iOS
+        run: |
+          sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer/
+          xcodebuild -version
+
+      - name: 📱 Install CocoaPods
+        run: |
+          cd ios
+          pod install
+
+      - name: 🏗️ Build iOS Release
+        run: |
+          flutter build ios \
+            --release \
+            --no-codesign \
+            --build-name=${{ needs.validate.outputs.version }} \
+            --build-number=${{ github.run_number }}
+
+      - name: 📦 Create iOS Archive
+        run: |
+          cd build/ios/iphoneos
+          zip -r "DocPilot-iOS-${{ needs.validate.outputs.version }}.zip" Runner.app
+
+      - name: 📝 Generate iOS Info
+        run: |
+          echo "## iOS Release Build" > ios-release-info.md
+          echo "" >> ios-release-info.md
+          echo "**Version:** ${{ needs.validate.outputs.version }}" >> ios-release-info.md
+          echo "**Build Number:** ${{ github.run_number }}" >> ios-release-info.md
+          echo "**Built:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ios-release-info.md
+          echo "**Commit:** ${{ github.sha }}" >> ios-release-info.md
+          echo "" >> ios-release-info.md
+          echo "**Note:** App is unsigned and requires code signing for distribution" >> ios-release-info.md
+
+      - name: 📤 Upload iOS Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-${{ needs.validate.outputs.version }}
+          path: |
+            build/ios/iphoneos/DocPilot-iOS-${{ needs.validate.outputs.version }}.zip
+            ios-release-info.md
+          retention-days: 30
+
+  build-web-release:
+    name: 🌐 Build Web Release
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 🌐 Enable Web
+        run: flutter config --enable-web
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🏗️ Build Web Release
+        run: |
+          flutter build web \
+            --release \
+            --web-renderer canvaskit \
+            --base-href "/" \
+            --dart-define=APP_VERSION=${{ needs.validate.outputs.version }}
+
+      - name: 📝 Add Version Info to Web Build
+        run: |
+          echo '{"version":"${{ needs.validate.outputs.version }}","buildNumber":"${{ github.run_number }}","buildDate":"$(date -u +"%Y-%m-%dT%H:%M:%SZ")","commit":"${{ github.sha }}"}' > build/web/version.json
+
+      - name: 📦 Create Web Archive
+        run: |
+          cd build
+          zip -r "DocPilot-Web-${{ needs.validate.outputs.version }}.zip" web/
+
+      - name: 📝 Generate Web Info
+        run: |
+          echo "## Web Release Build" > web-release-info.md
+          echo "" >> web-release-info.md
+          echo "**Version:** ${{ needs.validate.outputs.version }}" >> web-release-info.md
+          echo "**Build Number:** ${{ github.run_number }}" >> web-release-info.md
+          echo "**Built:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> web-release-info.md
+          echo "**Commit:** ${{ github.sha }}" >> web-release-info.md
+          echo "**Renderer:** CanvasKit" >> web-release-info.md
+          echo "" >> web-release-info.md
+          echo "**Deployment Instructions:**" >> web-release-info.md
+          echo "1. Extract the ZIP file" >> web-release-info.md
+          echo "2. Serve the contents from a web server" >> web-release-info.md
+          echo "3. Ensure proper MIME types for .wasm and .js files" >> web-release-info.md
+
+      - name: 📤 Upload Web Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-release-${{ needs.validate.outputs.version }}
+          path: |
+            build/DocPilot-Web-${{ needs.validate.outputs.version }}.zip
+            web-release-info.md
+          retention-days: 30
+
+  build-linux-release:
+    name: 🐧 Build Linux Release
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Install Linux Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 🐧 Enable Linux Desktop
+        run: flutter config --enable-linux-desktop
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🏗️ Build Linux Release
+        run: |
+          flutter build linux \
+            --release \
+            --build-name=${{ needs.validate.outputs.version }} \
+            --build-number=${{ github.run_number }}
+
+      - name: 📦 Create Linux Archive
+        run: |
+          cd build/linux/x64/release
+          tar -czf "DocPilot-Linux-${{ needs.validate.outputs.version }}.tar.gz" bundle/
+
+      - name: 📝 Generate Linux Info
+        run: |
+          echo "## Linux Release Build" > linux-release-info.md
+          echo "" >> linux-release-info.md
+          echo "**Version:** ${{ needs.validate.outputs.version }}" >> linux-release-info.md
+          echo "**Build Number:** ${{ github.run_number }}" >> linux-release-info.md
+          echo "**Built:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> linux-release-info.md
+          echo "**Commit:** ${{ github.sha }}" >> linux-release-info.md
+          echo "**Architecture:** x64" >> linux-release-info.md
+          echo "" >> linux-release-info.md
+          echo "**Installation Instructions:**" >> linux-release-info.md
+          echo "1. Extract: \`tar -xzf DocPilot-Linux-${{ needs.validate.outputs.version }}.tar.gz\`" >> linux-release-info.md
+          echo "2. Run: \`cd bundle && ./doc_pilot_new_app_gradel_fix\`" >> linux-release-info.md
+
+      - name: 📤 Upload Linux Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release-${{ needs.validate.outputs.version }}
+          path: |
+            build/linux/x64/release/DocPilot-Linux-${{ needs.validate.outputs.version }}.tar.gz
+            linux-release-info.md
+          retention-days: 30
+
+  # ========================================
+  # CREATE GITHUB RELEASE
+  # ========================================
+  create-release:
+    name: 🚀 Create GitHub Release
+    needs: [validate, build-android-release, build-ios-release, build-web-release, build-linux-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 📥 Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: release-artifacts
+
+      - name: 📋 Generate Release Notes
+        id: release_notes
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+
+          cat > release-notes.md << 'EOF'
+          ## 🎉 DocPilot ${{ needs.validate.outputs.version }}
+
+          This release includes builds for all supported platforms.
+
+          ### 📱 **What's Included**
+
+          - **Android APK** - Direct install package
+          - **Android AAB** - Google Play Store package
+          - **iOS App** - Requires code signing for device installation
+          - **Web App** - Progressive Web App build
+          - **Linux Desktop** - x64 desktop application
+
+          ### 📊 **Build Information**
+
+          - **Build Number:** ${{ github.run_number }}
+          - **Flutter Version:** ${{ env.FLUTTER_VERSION }}
+          - **Build Date:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          - **Commit:** ${{ github.sha }}
+
+          ### 📥 **Installation**
+
+          #### Android
+          - **APK:** Download and install directly on your device
+          - **AAB:** For Google Play Store distribution
+
+          #### iOS
+          - Download and install via Xcode or enterprise distribution
+          - Requires valid code signing certificate
+
+          #### Web
+          - Extract ZIP and serve from any web server
+          - Supports Progressive Web App features
+
+          #### Linux
+          - Extract TAR.GZ and run the executable
+          - Requires standard Linux desktop environment
+
+          ### 🔧 **Technical Requirements**
+
+          - **Android:** API level 21+ (Android 5.0+)
+          - **iOS:** iOS 12.0+
+          - **Web:** Modern browsers with WebAssembly support
+          - **Linux:** Ubuntu 18.04+ or equivalent
+
+          ---
+
+          🚀 **Generated with GitHub Actions CI/CD**
+          EOF
+
+      - name: 🚀 Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "DocPilot ${{ needs.validate.outputs.version }}"
+          body_path: release-notes.md
+          prerelease: ${{ needs.validate.outputs.is_prerelease }}
+          files: |
+            release-artifacts/build/app/outputs/flutter-apk/app-release.apk
+            release-artifacts/build/app/outputs/bundle/release/app-release.aab
+            release-artifacts/build/ios/iphoneos/DocPilot-iOS-${{ needs.validate.outputs.version }}.zip
+            release-artifacts/build/DocPilot-Web-${{ needs.validate.outputs.version }}.zip
+            release-artifacts/build/linux/x64/release/DocPilot-Linux-${{ needs.validate.outputs.version }}.tar.gz
+            release-artifacts/*-release-info.md
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_unmatched_files: false
+
+      - name: 📋 Deployment Summary
+        run: |
+          echo "## 🚀 Release Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.validate.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Release Type:** ${{ needs.validate.outputs.is_prerelease == 'true' && 'Pre-release' || 'Stable' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 **Artifacts Created**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Android APK" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Android AAB" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ iOS App Bundle" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Web Application" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Linux Desktop App" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 **Download:** [GitHub Releases](https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate.outputs.version }})" >> $GITHUB_STEP_SUMMARY
+
+  # ========================================
+  # NOTIFY SUCCESS
+  # ========================================
+  notify:
+    name: 📢 Notify Deployment
+    needs: [validate, create-release]
+    runs-on: ubuntu-latest
+    if: always() && (needs.create-release.result == 'success' || needs.create-release.result == 'skipped')
+
+    steps:
+      - name: 📋 Log Deployment
+        run: |
+          echo "Deployment completed for DocPilot ${{ needs.validate.outputs.version }}"
+          echo "Build artifacts are available in GitHub Actions and Releases"
+
+          # In a production environment, this could send notifications to:
+          # - Slack/Discord channels
+          # - Email lists
+          # - Deployment tracking systems
+          # - Update deployment status in project management tools
+
+          echo "## 🎯 Deployment Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Success:** DocPilot ${{ needs.validate.outputs.version }} has been built and released" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All platform builds completed successfully and release artifacts are available for download." >> $GITHUB_STEP_SUMMARY
