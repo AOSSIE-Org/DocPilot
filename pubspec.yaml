@@ -39,6 +39,8 @@ dependencies:
   share_plus: ^7.0.0
   flutter_dotenv: ^5.1.0
   provider: ^6.1.5+1
+  pdf: ^3.11.1
+  printing: ^5.13.4
 
 dev_dependencies:
   flutter_test:
