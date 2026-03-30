@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
+import 'package:doc_pilot_new_app_gradel_fix/models/pdf_settings.dart';
 
 /// Service for generating PDF documents from prescription and summary data
 class PdfService {
